@@ -1,22 +1,9 @@
 // Massa de dados fictícios para inicializar o sistema localmente (Seed Data)
-const SEED_VEHICLES = [
-    { id: "v1", placa: "MBS-1020", modelo: "Volvo FH 540 (Carreta)", tipo: "Carreta / Bitrem", propriedade: "Própria" },
-    { id: "v2", placa: "MBS-3040", modelo: "Scania R450 (Bitrem)", tipo: "Carreta / Bitrem", propriedade: "Própria" },
-    { id: "v3", placa: "ARG-8899", modelo: "Mercedes Axor 2544 (Terceirizado)", tipo: "Caminhão Truck (3 eixos)", propriedade: "Terceirizada" }
-];
+const SEED_VEHICLES = [];
 
-const SEED_DRIVERS = [
-    { id: "d1", nome: "Marcos Borges", cnh: "12345678910", categoria: "AE", validade: getRelativeDate(-15) }, // Vencida (Alerta de perigo)
-    { id: "d2", nome: "Carlos Henrique", cnh: "98765432100", categoria: "E", validade: getRelativeDate(20) },  // Vencendo em 20 dias (Aviso)
-    { id: "d3", nome: "Rogério Silva", cnh: "55566677788", categoria: "D", validade: getRelativeDate(250) }   // Ok
-];
+const SEED_DRIVERS = [];
 
-const SEED_TRIPS = [
-    { id: "t1", cliente: "Ambev SA", origem: "São Paulo - SP", destino: "Rio de Janeiro - RJ", placa: "MBS-1020", motorista: "Marcos Borges", receita: 4500, combustivel: 1200, pedagio: 350, diarias: 250, comissao: 500, manutencao: 0, status: "Concluída", data: getRelativeDate(-8), pago: "Pago", dataRecebimento: "" },
-    { id: "t2", cliente: "Coca-Cola FEMSA", origem: "Campinas - SP", destino: "Belo Horizonte - MG", placa: "MBS-3040", motorista: "Carlos Henrique", receita: 5800, combustivel: 1600, pedagio: 450, diarias: 300, comissao: 650, manutencao: 0, status: "Concluída", data: getRelativeDate(-5), pago: "Pago", dataRecebimento: "" },
-    { id: "t3", cliente: "JBS Alimentos", origem: "Ribeirão Preto - SP", destino: "Curitiba - PR", placa: "ARG-8899", motorista: "Rogério Silva", receita: 7200, combustivel: 2100, pedagio: 600, diarias: 400, comissao: 800, manutencao: 350, status: "Em Viagem", data: getRelativeDate(-2), pago: "Pendente", dataRecebimento: getRelativeDate(5) },
-    { id: "t4", cliente: "Ambev SA", origem: "São Paulo - SP", destino: "Campinas - SP", placa: "MBS-1020", motorista: "Marcos Borges", receita: 1800, combustivel: 450, pedagio: 120, diarias: 100, comissao: 200, manutencao: 0, status: "Concluída", data: getRelativeDate(-12), pago: "Pendente", dataRecebimento: getRelativeDate(12) }
-];
+const SEED_TRIPS = [];
 
 // Helper para gerar datas dinâmicas relativas a hoje
 function getRelativeDate(daysOffset) {
