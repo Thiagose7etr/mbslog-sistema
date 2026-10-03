@@ -172,10 +172,41 @@ async function loadTripsFromSupabase() {
         const { data, error } = await supabaseClient.from('trips').select('*');
         if (!error && data) {
             if (data.length > 0) {
-                appData.trips = data.map(t => ({
-                    ...t,
-                    dataRecebimento: t.datarecebimento || t.dataRecebimento || ""
-                }));
+                appData.trips = data.map(t => {
+                    let despesasExtras = [];
+                    try {
+                        if (t.despesasextras) {
+                            despesasExtras = typeof t.despesasextras === "string" ? JSON.parse(t.despesasextras) : t.despesasextras;
+                        } else {
+                            const cached = localStorage.getItem("mbslog_expenses_" + t.id);
+                            if (cached) despesasExtras = JSON.parse(cached);
+                        }
+                    } catch (e) {
+                        despesasExtras = [];
+                    }
+
+                    const extraTotal = Array.isArray(despesasExtras)
+                        ? despesasExtras.reduce((sum, d) => sum + (parseFloat(d.valor) || 0), 0)
+                        : 0;
+
+                    let maintVal = parseFloat(t.manutencao) || 0;
+                    if (!t.despesasextras && extraTotal > 0 && maintVal >= extraTotal) {
+                        maintVal = maintVal - extraTotal;
+                    }
+
+                    return {
+                        ...t,
+                        receita: parseFloat(t.receita) || 0,
+                        combustivel: parseFloat(t.combustivel) || 0,
+                        pedagio: parseFloat(t.pedagio) || 0,
+                        diarias: parseFloat(t.diarias) || 0,
+                        comissao: parseFloat(t.comissao) || 0,
+                        manutencao: maintVal,
+                        dataRecebimento: t.datarecebimento || t.dataRecebimento || "",
+                        despesasExtras: Array.isArray(despesasExtras) ? despesasExtras : [],
+                        despesaExtra: extraTotal
+                    };
+                });
                 onDataChangedCallback();
             } else {
                 for (const t of SEED_TRIPS) {
@@ -263,6 +294,15 @@ async function addTrip(trip) {
     trip.comissao = parseFloat(trip.comissao) || 0;
     trip.manutencao = parseFloat(trip.manutencao) || 0;
 
+    const extras = trip.despesasExtras || [];
+    const totalExtras = Array.isArray(extras)
+        ? extras.reduce((sum, d) => sum + (parseFloat(d.valor) || 0), 0)
+        : (parseFloat(trip.despesaExtra) || 0);
+
+    if (extras.length > 0) {
+        localStorage.setItem("mbslog_expenses_" + trip.id, JSON.stringify(extras));
+    }
+
     if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
         const payload = {
             id: trip.id,
@@ -280,16 +320,25 @@ async function addTrip(trip) {
             manutencao: trip.manutencao,
             status: trip.status || "Concluída",
             pago: trip.pago || "Pago",
-            datarecebimento: trip.dataRecebimento || trip.datarecebimento || ""
+            datarecebimento: trip.dataRecebimento || trip.datarecebimento || "",
+            despesasextras: JSON.stringify(extras)
         };
-        const { error } = await supabaseClient.from('trips').insert([payload]);
+        let { error } = await supabaseClient.from('trips').insert([payload]);
         if (error) {
-            console.error("Erro ao salvar viagem no Supabase:", error);
-            alert("Erro ao salvar viagem no Supabase: " + error.message);
-        } else {
-            await loadTripsFromSupabase();
+            console.warn("Aviso ao tentar salvar despesas extras na nova viagem (coluna pode não existir ainda):", error);
+            delete payload.despesasextras;
+            payload.manutencao += totalExtras;
+            const fallbackRes = await supabaseClient.from('trips').insert([payload]);
+            if (fallbackRes.error) {
+                console.error("Erro ao salvar viagem no Supabase:", fallbackRes.error);
+                alert("Erro ao salvar viagem no Supabase: " + fallbackRes.error.message);
+                return;
+            }
         }
+        await loadTripsFromSupabase();
     } else {
+        trip.despesasExtras = extras;
+        trip.despesaExtra = totalExtras;
         appData.trips.push(trip);
         localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
         onDataChangedCallback();
@@ -378,6 +427,14 @@ async function addExtraExpense(id, amount) {
 }
 
 async function updateTrip(id, updatedData) {
+    if (updatedData.despesasExtras) {
+        localStorage.setItem("mbslog_expenses_" + id, JSON.stringify(updatedData.despesasExtras));
+    }
+
+    const totalExtras = Array.isArray(updatedData.despesasExtras)
+        ? updatedData.despesasExtras.reduce((sum, d) => sum + (parseFloat(d.valor) || 0), 0)
+        : (parseFloat(updatedData.despesaExtra) || 0);
+
     if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
         const payload = {
             cliente: updatedData.cliente,
@@ -386,27 +443,43 @@ async function updateTrip(id, updatedData) {
             destino: updatedData.destino,
             placa: updatedData.placa,
             motorista: updatedData.motorista,
-            receita: updatedData.receita,
-            combustivel: updatedData.combustivel,
-            pedagio: updatedData.pedagio,
-            diarias: updatedData.diarias,
-            comissao: updatedData.comissao,
-            manutencao: updatedData.manutencao,
+            receita: parseFloat(updatedData.receita) || 0,
+            combustivel: parseFloat(updatedData.combustivel) || 0,
+            pedagio: parseFloat(updatedData.pedagio) || 0,
+            diarias: parseFloat(updatedData.diarias) || 0,
+            comissao: parseFloat(updatedData.comissao) || 0,
+            manutencao: parseFloat(updatedData.manutencao) || 0,
             status: updatedData.status,
             pago: updatedData.pago,
-            datarecebimento: updatedData.dataRecebimento || updatedData.datarecebimento || ""
+            datarecebimento: updatedData.dataRecebimento || updatedData.datarecebimento || "",
+            despesasextras: JSON.stringify(updatedData.despesasExtras || [])
         };
-        const { error } = await supabaseClient.from('trips').update(payload).eq('id', id);
+
+        let { error } = await supabaseClient.from('trips').update(payload).eq('id', id);
+
         if (error) {
-            console.error("Erro ao atualizar viagem no Supabase:", error);
-            alert("Erro ao atualizar viagem: " + error.message);
-        } else {
-            await loadTripsFromSupabase();
+            console.warn("Aviso ao tentar atualizar despesas extras no Supabase (tentando fallback):", error);
+            delete payload.despesasextras;
+            payload.manutencao = (parseFloat(payload.manutencao) || 0) + totalExtras;
+
+            const fallbackRes = await supabaseClient.from('trips').update(payload).eq('id', id);
+            if (fallbackRes.error) {
+                console.error("Erro ao atualizar viagem no Supabase:", fallbackRes.error);
+                alert("Erro ao salvar alterações no Supabase: " + fallbackRes.error.message);
+                return;
+            }
         }
+
+        await loadTripsFromSupabase();
     } else {
         appData.trips = appData.trips.map(t => {
             if (t.id === id) {
-                return { ...t, ...updatedData };
+                return { 
+                    ...t, 
+                    ...updatedData,
+                    despesasExtras: updatedData.despesasExtras || [],
+                    despesaExtra: totalExtras
+                };
             }
             return t;
         });
@@ -556,27 +629,44 @@ function setupFormSubmits() {
     if (tripForm) {
         tripForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            const formData = {
-                cliente: document.getElementById("trip_client").value,
-                origem: document.getElementById("trip_origin").value,
-                destino: document.getElementById("trip_destination").value,
-                placa: document.getElementById("trip_vehicle").value,
-                motorista: document.getElementById("trip_driver").value,
-                receita: parseFloat(document.getElementById("trip_receita").value) || 0,
-                combustivel: parseFloat(document.getElementById("trip_diesel").value) || 0,
-                pedagio: parseFloat(document.getElementById("trip_tolls").value) || 0,
-                diarias: parseFloat(document.getElementById("trip_diarias").value) || 0,
-                comissao: parseFloat(document.getElementById("trip_comission").value) || 0,
-                manutencao: parseFloat(document.getElementById("trip_maint").value) || 0,
-                status: document.getElementById("trip_status").value,
-                data: document.getElementById("trip_date").value || getRelativeDate(0),
-                pago: document.getElementById("trip_payment_status").value,
-                dataRecebimento: document.getElementById("trip_payment_date").value || ""
-            };
-            
-            await addTrip(formData);
-            tripForm.reset();
-            document.getElementById("modal-trip").classList.remove("active");
+            const submitBtn = tripForm.querySelector("button[type='submit']");
+            const originalText = submitBtn ? submitBtn.textContent : "Salvar Viagem";
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Salvando...";
+            }
+
+            try {
+                const formData = {
+                    cliente: document.getElementById("trip_client").value,
+                    origem: document.getElementById("trip_origin").value,
+                    destino: document.getElementById("trip_destination").value,
+                    placa: document.getElementById("trip_vehicle").value,
+                    motorista: document.getElementById("trip_driver").value,
+                    receita: parseFloat(document.getElementById("trip_receita").value) || 0,
+                    combustivel: parseFloat(document.getElementById("trip_diesel").value) || 0,
+                    pedagio: parseFloat(document.getElementById("trip_tolls").value) || 0,
+                    diarias: parseFloat(document.getElementById("trip_diarias").value) || 0,
+                    comissao: parseFloat(document.getElementById("trip_comission").value) || 0,
+                    manutencao: parseFloat(document.getElementById("trip_maint").value) || 0,
+                    status: document.getElementById("trip_status").value,
+                    data: document.getElementById("trip_date").value || getRelativeDate(0),
+                    pago: document.getElementById("trip_payment_status").value,
+                    dataRecebimento: document.getElementById("trip_payment_date").value || ""
+                };
+                
+                await addTrip(formData);
+                tripForm.reset();
+                document.getElementById("modal-trip").classList.remove("active");
+            } catch (err) {
+                console.error("Erro ao salvar nova viagem:", err);
+                alert("Erro ao salvar nova viagem: " + err.message);
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            }
         });
     }
 
@@ -585,29 +675,46 @@ function setupFormSubmits() {
     if (editForm) {
         editForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            const tripId = document.getElementById("edit_trip_id").value;
-            const updatedData = {
-                cliente: document.getElementById("edit_trip_client").value,
-                data: document.getElementById("edit_trip_date").value,
-                origem: document.getElementById("edit_trip_origin").value,
-                destino: document.getElementById("edit_trip_destination").value,
-                placa: document.getElementById("edit_trip_vehicle").value,
-                motorista: document.getElementById("edit_trip_driver").value,
-                receita: parseFloat(document.getElementById("edit_trip_receita").value) || 0,
-                combustivel: parseFloat(document.getElementById("edit_trip_diesel").value) || 0,
-                pedagio: parseFloat(document.getElementById("edit_trip_tolls").value) || 0,
-                diarias: parseFloat(document.getElementById("edit_trip_diarias").value) || 0,
-                comissao: parseFloat(document.getElementById("edit_trip_comission").value) || 0,
-                manutencao: parseFloat(document.getElementById("edit_trip_maint").value) || 0,
-                status: document.getElementById("edit_trip_status").value,
-                pago: document.getElementById("edit_trip_payment_status").value,
-                dataRecebimento: document.getElementById("edit_trip_payment_date").value || "",
-                despesasExtras: currentEditExpenses,
-                despesaExtra: currentEditExpenses.reduce((sum, d) => sum + d.valor, 0)
-            };
+            const submitBtn = editForm.querySelector("button[type='submit']");
+            const originalText = submitBtn ? submitBtn.textContent : "Salvar Alterações";
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Salvando...";
+            }
 
-            await updateTrip(tripId, updatedData);
-            document.getElementById("modal-trip-detail").classList.remove("active");
+            try {
+                const tripId = document.getElementById("edit_trip_id").value;
+                const updatedData = {
+                    cliente: document.getElementById("edit_trip_client").value,
+                    data: document.getElementById("edit_trip_date").value,
+                    origem: document.getElementById("edit_trip_origin").value,
+                    destino: document.getElementById("edit_trip_destination").value,
+                    placa: document.getElementById("edit_trip_vehicle").value,
+                    motorista: document.getElementById("edit_trip_driver").value,
+                    receita: parseFloat(document.getElementById("edit_trip_receita").value) || 0,
+                    combustivel: parseFloat(document.getElementById("edit_trip_diesel").value) || 0,
+                    pedagio: parseFloat(document.getElementById("edit_trip_tolls").value) || 0,
+                    diarias: parseFloat(document.getElementById("edit_trip_diarias").value) || 0,
+                    comissao: parseFloat(document.getElementById("edit_trip_comission").value) || 0,
+                    manutencao: parseFloat(document.getElementById("edit_trip_maint").value) || 0,
+                    status: document.getElementById("edit_trip_status").value,
+                    pago: document.getElementById("edit_trip_payment_status").value,
+                    dataRecebimento: document.getElementById("edit_trip_payment_date").value || "",
+                    despesasExtras: currentEditExpenses,
+                    despesaExtra: currentEditExpenses.reduce((sum, d) => sum + (parseFloat(d.valor) || 0), 0)
+                };
+
+                await updateTrip(tripId, updatedData);
+                document.getElementById("modal-trip-detail").classList.remove("active");
+            } catch (err) {
+                console.error("Erro ao salvar alterações da viagem:", err);
+                alert("Erro ao salvar alterações da viagem: " + err.message);
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            }
         });
     }
 
@@ -951,10 +1058,21 @@ function openTripDetail(tripId) {
     populateEditDropdowns(trip.placa, trip.motorista);
 
     // Carregar despesas extras existentes
-    currentEditExpenses = Array.isArray(trip.despesasExtras) ? [...trip.despesasExtras] : [];
-    // Se tem despesaExtra mas não tem array itemizado, criar um item genérico
-    if (currentEditExpenses.length === 0 && (trip.despesaExtra || 0) > 0) {
-        currentEditExpenses.push({ descricao: "Despesa extra (migrada)", valor: trip.despesaExtra });
+    if (Array.isArray(trip.despesasExtras) && trip.despesasExtras.length > 0) {
+        currentEditExpenses = JSON.parse(JSON.stringify(trip.despesasExtras));
+    } else {
+        const cached = localStorage.getItem("mbslog_expenses_" + trip.id);
+        if (cached) {
+            try {
+                currentEditExpenses = JSON.parse(cached);
+            } catch(e) {
+                currentEditExpenses = [];
+            }
+        } else if ((trip.despesaExtra || 0) > 0) {
+            currentEditExpenses = [{ descricao: "Despesa extra (migrada)", valor: trip.despesaExtra }];
+        } else {
+            currentEditExpenses = [];
+        }
     }
 
     renderDetailExpenses();
@@ -1212,14 +1330,14 @@ function renderReports() {
         const costPerPlaca = {};
         getFilteredTrips().forEach(t => {
             const placa = t.placa || "Sem Veículo";
-            const tripCost = (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0);
+            const tripCost = (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0) + (t.despesaExtra || 0);
             
             if (!costPerPlaca[placa]) {
                 costPerPlaca[placa] = { diesel: 0, maintenance: 0, other: 0, total: 0, count: 0 };
             }
             costPerPlaca[placa].diesel += t.combustivel || 0;
             costPerPlaca[placa].maintenance += t.manutencao || 0;
-            costPerPlaca[placa].other += (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0);
+            costPerPlaca[placa].other += (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.despesaExtra || 0);
             costPerPlaca[placa].total += tripCost;
             costPerPlaca[placa].count++;
         });
@@ -1251,7 +1369,7 @@ function renderReports() {
         const clientData = {};
         getFilteredTrips().forEach(t => {
             const cli = t.cliente || "Diversos";
-            const tripCost = (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0);
+            const tripCost = (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0) + (t.despesaExtra || 0);
             const profit = t.receita - tripCost;
 
             if (!clientData[cli]) {
@@ -1307,7 +1425,7 @@ function renderChart() {
             dailyData[dateStr] = { revenue: 0, expense: 0 };
         }
         dailyData[dateStr].revenue += t.receita || 0;
-        dailyData[dateStr].expense += (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0);
+        dailyData[dateStr].expense += (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0) + (t.despesaExtra || 0);
     });
 
     Object.keys(dailyData).forEach(date => {
@@ -1399,9 +1517,11 @@ function exportTripsToCSV() {
 
     // Ponto e vírgula como separador para compatibilidade padrão com Excel em português
     let csvContent = "\uFEFF"; // UTF-8 BOM para abrir com acentos corretos no Excel
-    csvContent += "Data;Cliente;Origem;Destino;Placa;Motorista;Receita Bruta;Combustível;Pedágio;Diárias;Comissão;Manutenção;Status Viagem;Status Pagamento;Data Recebimento\r\n";
+    csvContent += "Data;Cliente;Origem;Destino;Placa;Motorista;Receita Bruta;Combustível;Pedágio;Diárias;Comissão;Manutenção;Despesas Extras;Custo Total;Saldo Líquido;Status Viagem;Status Pagamento;Data Recebimento\r\n";
 
     tripsToExport.forEach(t => {
+        const totalCost = (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0) + (t.despesaExtra || 0);
+        const profit = (t.receita || 0) - totalCost;
         const row = [
             t.data || "",
             t.cliente || "",
@@ -1415,6 +1535,9 @@ function exportTripsToCSV() {
             t.diarias || 0,
             t.comissao || 0,
             t.manutencao || 0,
+            t.despesaExtra || 0,
+            totalCost,
+            profit,
             t.status || "",
             t.pago || "Pago",
             t.dataRecebimento || ""

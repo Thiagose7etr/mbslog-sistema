@@ -42,8 +42,12 @@ CREATE TABLE IF NOT EXISTS public.trips (
     status TEXT DEFAULT 'Concluída',
     pago TEXT DEFAULT 'Pago',
     dataRecebimento TEXT,
+    despesasextras TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- MIGRAÇÃO (Caso a tabela já exista, adiciona a coluna despesasextras):
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS despesasextras TEXT;
 
 -- 4. HABILITAR SINCRONIZAÇÃO EM TEMPO REAL (REALTIME)
 ALTER PUBLICATION supabase_realtime ADD TABLE public.vehicles;
