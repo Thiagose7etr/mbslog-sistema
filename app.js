@@ -233,6 +233,63 @@ async function removeTrip(id) {
     }
 }
 
+async function updateTripStatus(id, newStatus) {
+    if (USE_FIREBASE && db) {
+        const querySnapshot = await db.collection("trips").get();
+        querySnapshot.forEach(async (docRef) => {
+            if (docRef.data().id === id || docRef.id === id) {
+                await db.collection("trips").doc(docRef.id).update({ status: newStatus });
+            }
+        });
+    } else {
+        appData.trips = appData.trips.map(t => {
+            if (t.id === id) t.status = newStatus;
+            return t;
+        });
+        localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
+        onDataChangedCallback();
+    }
+}
+
+async function updateTripPayment(id, newPayment) {
+    if (USE_FIREBASE && db) {
+        const querySnapshot = await db.collection("trips").get();
+        querySnapshot.forEach(async (docRef) => {
+            if (docRef.data().id === id || docRef.id === id) {
+                await db.collection("trips").doc(docRef.id).update({ pago: newPayment });
+            }
+        });
+    } else {
+        appData.trips = appData.trips.map(t => {
+            if (t.id === id) t.pago = newPayment;
+            return t;
+        });
+        localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
+        onDataChangedCallback();
+    }
+}
+
+async function addExtraExpense(id, amount) {
+    if (USE_FIREBASE && db) {
+        const querySnapshot = await db.collection("trips").get();
+        querySnapshot.forEach(async (docRef) => {
+            if (docRef.data().id === id || docRef.id === id) {
+                const currentExtra = docRef.data().despesaExtra || 0;
+                await db.collection("trips").doc(docRef.id).update({ despesaExtra: currentExtra + amount });
+            }
+        });
+    } else {
+        appData.trips = appData.trips.map(t => {
+            if (t.id === id) {
+                t.despesaExtra = (t.despesaExtra || 0) + amount;
+            }
+            return t;
+        });
+        localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
+        onDataChangedCallback();
+    }
+}
+
 
 // -------------------------------------------------------------
 // CONTROLLER DA INTERFACE DO USUÁRIO (DOM INTERACTION)
@@ -587,7 +644,7 @@ function renderDashboardKPIs() {
 
     filteredTrips.forEach(t => {
         totalRevenue += t.receita || 0;
-        totalExpenses += (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0);
+        totalExpenses += (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0) + (t.despesaExtra || 0);
         if (t.pago === "Pendente") {
             totalReceivables += t.receita || 0;
         }
@@ -628,7 +685,7 @@ function renderTripsTable() {
     }
 
     filteredTrips.forEach(t => {
-        const totalCost = (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0);
+        const totalCost = (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0) + (t.despesaExtra || 0);
         const profit = t.receita - totalCost;
         const statusClass = t.status === "Concluída" ? "badge success" : "badge warning";
         const paymentClass = t.pago === "Pago" ? "badge success" : "badge warning";
@@ -647,17 +704,46 @@ function renderTripsTable() {
                 <span class="${paymentClass}">${t.pago}</span>
             </td>
             <td>
+                <select class="trip-status-select" data-id="${t.id}" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); margin-bottom: 4px; display: block;">
+                    <option value="Em Viagem" ${t.status === "Em Viagem" ? "selected" : ""}>Em Viagem</option>
+                    <option value="Concluída" ${t.status === "Concluída" ? "selected" : ""}>Concluída</option>
+                    <option value="Cancelada" ${t.status === "Cancelada" ? "selected" : ""}>Cancelada</option>
+                </select>
+                <select class="trip-payment-select" data-id="${t.id}" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); display: block;">
+                    <option value="Pago" ${t.pago === "Pago" ? "selected" : ""}>Pago</option>
+                    <option value="Pendente" ${t.pago === "Pendente" ? "selected" : ""}>Pendente</option>
+                </select>
+            </td>
+            <td style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
+                <button class="btn btn-secondary btn-add-expense" data-id="${t.id}" style="padding: 4px 8px; font-size:0.75rem;" title="Adicionar despesa extra">
+                    + Despesa
+                </button>
                 <button class="btn btn-danger btn-delete-trip" data-id="${t.id}" style="padding: 4px 8px; font-size:0.75rem;">
                     Excluir
                 </button>
             </td>
         `;
         
-        // Add event delete listener
-        tr.querySelector(".btn-delete-trip").addEventListener("click", async function() {
-            if (confirm("Tem certeza que deseja excluir esta viagem?")) {
-                const id = this.getAttribute("data-id");
-                await removeTrip(id);
+        // Add status change listener
+        tr.querySelector(".trip-status-select").addEventListener("change", async function() {
+            const id = this.getAttribute("data-id");
+            const newStatus = this.value;
+            await updateTripStatus(id, newStatus);
+        });
+
+        // Add payment status change listener
+        tr.querySelector(".trip-payment-select").addEventListener("change", async function() {
+            const id = this.getAttribute("data-id");
+            const newPayment = this.value;
+            await updateTripPayment(id, newPayment);
+        });
+
+        // Add expense listener
+        tr.querySelector(".btn-add-expense").addEventListener("click", async function() {
+            const id = this.getAttribute("data-id");
+            const extra = prompt("Digite o valor da despesa adicional (R$):");
+            if (extra !== null && !isNaN(parseFloat(extra))) {
+                await addExtraExpense(id, parseFloat(extra));
             }
         });
 
