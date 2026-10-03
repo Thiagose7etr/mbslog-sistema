@@ -618,3 +618,153 @@ tr:hover td {
     background-color: var(--bg-secondary);
     color: var(--text-primary);
 }
+
+/* Trip Detail Modal - Expenses Section */
+.detail-expenses-section {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 8px;
+    margin-bottom: 20px;
+}
+
+.detail-expenses-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.detail-expenses-header h4 {
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--brand-primary);
+}
+
+.detail-expenses-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.detail-expense-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.88rem;
+    transition: background-color 0.15s ease;
+}
+
+.detail-expense-item:hover {
+    background-color: var(--bg-hover);
+}
+
+.detail-expense-item .expense-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.detail-expense-item .expense-desc {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.detail-expense-item .expense-value {
+    color: var(--danger);
+    font-weight: 600;
+    font-family: var(--font-heading);
+}
+
+.detail-expense-item .btn-remove-expense {
+    background: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--danger);
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.detail-expense-item .btn-remove-expense:hover {
+    background-color: rgba(239, 68, 68, 0.15);
+    border-color: var(--danger);
+}
+
+.detail-add-expense-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.detail-expenses-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    padding: 12px;
+    font-style: italic;
+}
+
+/* Financial Summary in Detail Modal */
+.detail-financial-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 0;
+    margin-bottom: 4px;
+}
+
+.summary-card {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+}
+
+.summary-card .summary-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.summary-card .summary-value {
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.summary-card .summary-value.positive {
+    color: var(--brand-primary);
+}
+
+.summary-card .summary-value.negative {
+    color: var(--danger);
+}
+
+.summary-card .summary-value.neutral {
+    color: var(--text-primary);
+}
+
+/* Clickable Trip Rows */
+tr.trip-row-clickable {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+tr.trip-row-clickable:hover td {
+    background-color: rgba(43, 226, 230, 0.04) !important;
+}

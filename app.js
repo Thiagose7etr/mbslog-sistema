@@ -83,40 +83,111 @@ function getFilteredTrips() {
     });
 }
 
-if (USE_FIREBASE) {
+let supabaseClient = null;
+
+if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE) {
     try {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        console.log("Firebase conectado com sucesso!");
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("Supabase conectado com sucesso!");
 
-        // Escuta em tempo real para coleções no Firestore usando API Compat
-        db.collection("vehicles").onSnapshot((snapshot) => {
-            appData.vehicles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            onDataChangedCallback();
-        }, (error) => {
-            console.error("Erro ao sincronizar veículos:", error);
-        });
-        
-        db.collection("drivers").onSnapshot((snapshot) => {
-            appData.drivers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            onDataChangedCallback();
-        }, (error) => {
-            console.error("Erro ao sincronizar motoristas:", error);
-        });
+        // Carregar dados iniciais da nuvem
+        loadSupabaseData();
 
-        db.collection("trips").onSnapshot((snapshot) => {
-            appData.trips = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            onDataChangedCallback();
-        }, (error) => {
-            console.error("Erro ao sincronizar viagens:", error);
-        });
+        // Escuta em tempo real para coleções no Supabase (Realtime)
+        supabaseClient.channel('realtime-vayko-fleet')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, () => loadVehiclesFromSupabase())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadDriversFromSupabase())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => loadTripsFromSupabase())
+            .subscribe();
+
     } catch (error) {
-        console.error("Falha ao inicializar o Firebase. Usando LocalStorage fallback.", error);
+        console.error("Falha ao inicializar o Supabase. Usando LocalStorage fallback.", error);
         initializeLocalStorage();
     }
 } else {
     console.log("Utilizando modo de Demonstração Local (LocalStorage).");
     initializeLocalStorage();
+}
+
+async function loadSupabaseData() {
+    await Promise.all([
+        loadVehiclesFromSupabase(),
+        loadDriversFromSupabase(),
+        loadTripsFromSupabase()
+    ]);
+}
+
+async function loadVehiclesFromSupabase() {
+    if (!supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient.from('vehicles').select('*');
+        if (!error && data) {
+            if (data.length > 0) {
+                appData.vehicles = data;
+                onDataChangedCallback();
+            } else {
+                // Popular tabela com dados de semente se estiver vazia
+                for (const v of SEED_VEHICLES) {
+                    await supabaseClient.from('vehicles').insert([v]);
+                }
+                const res = await supabaseClient.from('vehicles').select('*');
+                if (res.data) {
+                    appData.vehicles = res.data;
+                    onDataChangedCallback();
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Erro ao buscar veículos no Supabase:", e);
+    }
+}
+
+async function loadDriversFromSupabase() {
+    if (!supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient.from('drivers').select('*');
+        if (!error && data) {
+            if (data.length > 0) {
+                appData.drivers = data;
+                onDataChangedCallback();
+            } else {
+                for (const d of SEED_DRIVERS) {
+                    await supabaseClient.from('drivers').insert([d]);
+                }
+                const res = await supabaseClient.from('drivers').select('*');
+                if (res.data) {
+                    appData.drivers = res.data;
+                    onDataChangedCallback();
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Erro ao buscar motoristas no Supabase:", e);
+    }
+}
+
+async function loadTripsFromSupabase() {
+    if (!supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient.from('trips').select('*');
+        if (!error && data) {
+            if (data.length > 0) {
+                appData.trips = data;
+                onDataChangedCallback();
+            } else {
+                for (const t of SEED_TRIPS) {
+                    await supabaseClient.from('trips').insert([t]);
+                }
+                const res = await supabaseClient.from('trips').select('*');
+                if (res.data) {
+                    appData.trips = res.data;
+                    onDataChangedCallback();
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Erro ao buscar viagens no Supabase:", e);
+    }
 }
 
 function initializeLocalStorage() {
@@ -146,11 +217,12 @@ function initializeLocalStorage() {
     setTimeout(() => { onDataChangedCallback(); }, 100);
 }
 
-// Operações de Escrita (CRUD) abstratas para lidar com Cloud ou LocalStorage
+// Operações de Escrita (CRUD) abstratas para lidar com Cloud (Supabase) ou LocalStorage
 async function addVehicle(vehicle) {
     vehicle.id = "v_" + Date.now();
-    if (USE_FIREBASE && db) {
-        await db.collection("vehicles").add(vehicle);
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('vehicles').insert([vehicle]);
+        await loadVehiclesFromSupabase();
     } else {
         appData.vehicles.push(vehicle);
         localStorage.setItem("mbslog_vehicles", JSON.stringify(appData.vehicles));
@@ -160,8 +232,9 @@ async function addVehicle(vehicle) {
 
 async function addDriver(driver) {
     driver.id = "d_" + Date.now();
-    if (USE_FIREBASE && db) {
-        await db.collection("drivers").add(driver);
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('drivers').insert([driver]);
+        await loadDriversFromSupabase();
     } else {
         appData.drivers.push(driver);
         localStorage.setItem("mbslog_drivers", JSON.stringify(appData.drivers));
@@ -179,8 +252,9 @@ async function addTrip(trip) {
     trip.comissao = parseFloat(trip.comissao) || 0;
     trip.manutencao = parseFloat(trip.manutencao) || 0;
 
-    if (USE_FIREBASE && db) {
-        await db.collection("trips").add(trip);
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('trips').insert([trip]);
+        await loadTripsFromSupabase();
     } else {
         appData.trips.push(trip);
         localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
@@ -189,13 +263,9 @@ async function addTrip(trip) {
 }
 
 async function removeVehicle(id) {
-    if (USE_FIREBASE && db) {
-        const querySnapshot = await db.collection("vehicles").get();
-        querySnapshot.forEach(async (docRef) => {
-            if (docRef.data().id === id || docRef.id === id) {
-                await db.collection("vehicles").doc(docRef.id).delete();
-            }
-        });
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('vehicles').delete().eq('id', id);
+        await loadVehiclesFromSupabase();
     } else {
         appData.vehicles = appData.vehicles.filter(v => v.id !== id);
         localStorage.setItem("mbslog_vehicles", JSON.stringify(appData.vehicles));
@@ -204,13 +274,9 @@ async function removeVehicle(id) {
 }
 
 async function removeDriver(id) {
-    if (USE_FIREBASE && db) {
-        const querySnapshot = await db.collection("drivers").get();
-        querySnapshot.forEach(async (docRef) => {
-            if (docRef.data().id === id || docRef.id === id) {
-                await db.collection("drivers").doc(docRef.id).delete();
-            }
-        });
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('drivers').delete().eq('id', id);
+        await loadDriversFromSupabase();
     } else {
         appData.drivers = appData.drivers.filter(d => d.id !== id);
         localStorage.setItem("mbslog_drivers", JSON.stringify(appData.drivers));
@@ -219,13 +285,9 @@ async function removeDriver(id) {
 }
 
 async function removeTrip(id) {
-    if (USE_FIREBASE && db) {
-        const querySnapshot = await db.collection("trips").get();
-        querySnapshot.forEach(async (docRef) => {
-            if (docRef.data().id === id || docRef.id === id) {
-                await db.collection("trips").doc(docRef.id).delete();
-            }
-        });
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('trips').delete().eq('id', id);
+        await loadTripsFromSupabase();
     } else {
         appData.trips = appData.trips.filter(t => t.id !== id);
         localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
@@ -282,6 +344,26 @@ async function addExtraExpense(id, amount) {
         appData.trips = appData.trips.map(t => {
             if (t.id === id) {
                 t.despesaExtra = (t.despesaExtra || 0) + amount;
+            }
+            return t;
+        });
+        localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
+        onDataChangedCallback();
+    }
+}
+
+async function updateTrip(id, updatedData) {
+    if (USE_FIREBASE && db) {
+        const querySnapshot = await db.collection("trips").get();
+        querySnapshot.forEach(async (docRef) => {
+            if (docRef.data().id === id || docRef.id === id) {
+                await db.collection("trips").doc(docRef.id).update(updatedData);
+            }
+        });
+    } else {
+        appData.trips = appData.trips.map(t => {
+            if (t.id === id) {
+                return { ...t, ...updatedData };
             }
             return t;
         });
@@ -369,6 +451,41 @@ function setupModals() {
             btn.closest(".modal-overlay").classList.remove("active");
         });
     });
+
+    // Botão adicionar despesa extra no modal de detalhes
+    const btnAddDetailExpense = document.getElementById("btn-add-detail-expense");
+    if (btnAddDetailExpense) {
+        btnAddDetailExpense.addEventListener("click", () => {
+            const descInput = document.getElementById("edit_expense_desc");
+            const valueInput = document.getElementById("edit_expense_value");
+            const desc = descInput.value.trim();
+            const value = parseFloat(valueInput.value);
+
+            if (!desc || isNaN(value) || value <= 0) {
+                alert("Preencha a descrição e um valor válido para a despesa.");
+                return;
+            }
+
+            // Adicionar ao array temporário de despesas extras
+            currentEditExpenses.push({ descricao: desc, valor: value });
+            descInput.value = "";
+            valueInput.value = "";
+            renderDetailExpenses();
+            updateDetailSummary();
+        });
+    }
+
+    // Botão excluir viagem a partir do modal de detalhes
+    const btnDeleteFromDetail = document.getElementById("btn-delete-from-detail");
+    if (btnDeleteFromDetail) {
+        btnDeleteFromDetail.addEventListener("click", async () => {
+            const tripId = document.getElementById("edit_trip_id").value;
+            if (confirm("Tem certeza que deseja excluir esta viagem permanentemente?")) {
+                await removeTrip(tripId);
+                document.getElementById("modal-trip-detail").classList.remove("active");
+            }
+        });
+    }
 }
 
 function populateDropdowns() {
@@ -417,6 +534,37 @@ function setupFormSubmits() {
             await addTrip(formData);
             tripForm.reset();
             document.getElementById("modal-trip").classList.remove("active");
+        });
+    }
+
+    // Editar Viagem (modal de detalhes)
+    const editForm = document.getElementById("form-trip-edit");
+    if (editForm) {
+        editForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const tripId = document.getElementById("edit_trip_id").value;
+            const updatedData = {
+                cliente: document.getElementById("edit_trip_client").value,
+                data: document.getElementById("edit_trip_date").value,
+                origem: document.getElementById("edit_trip_origin").value,
+                destino: document.getElementById("edit_trip_destination").value,
+                placa: document.getElementById("edit_trip_vehicle").value,
+                motorista: document.getElementById("edit_trip_driver").value,
+                receita: parseFloat(document.getElementById("edit_trip_receita").value) || 0,
+                combustivel: parseFloat(document.getElementById("edit_trip_diesel").value) || 0,
+                pedagio: parseFloat(document.getElementById("edit_trip_tolls").value) || 0,
+                diarias: parseFloat(document.getElementById("edit_trip_diarias").value) || 0,
+                comissao: parseFloat(document.getElementById("edit_trip_comission").value) || 0,
+                manutencao: parseFloat(document.getElementById("edit_trip_maint").value) || 0,
+                status: document.getElementById("edit_trip_status").value,
+                pago: document.getElementById("edit_trip_payment_status").value,
+                dataRecebimento: document.getElementById("edit_trip_payment_date").value || "",
+                despesasExtras: currentEditExpenses,
+                despesaExtra: currentEditExpenses.reduce((sum, d) => sum + d.valor, 0)
+            };
+
+            await updateTrip(tripId, updatedData);
+            document.getElementById("modal-trip-detail").classList.remove("active");
         });
     }
 
@@ -558,20 +706,20 @@ function populateYearSelects() {
 // RENDERIZAÇÃO DA TELA E CÁLCULO DE RELATÓRIOS
 // -------------------------------------------------------------
 function updateUI() {
-    // 0. Atualizar opções de ano nos filtros (caso novas viagens tenham sido adicionadas)
-    populateYearSelects();
-
-    // 1. Atualizar Painel de Banco de Dados / Nuvem
+    // 0. Atualizar Status do Banco de Dados
     const dbStatus = document.getElementById("db-status");
     if (dbStatus) {
-        if (USE_FIREBASE) {
+        if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE) {
             dbStatus.className = "badge success";
-            dbStatus.textContent = "NUVEM CLOUD (FIRESTORE) CONECTADO";
+            dbStatus.textContent = "NUVEM SUPABASE CONECTADA";
         } else {
             dbStatus.className = "badge warning";
             dbStatus.textContent = "DEMONSTRAÇÃO LOCAL (LOCALSTORAGE)";
         }
     }
+
+    // Atualizar opções de ano nos filtros (caso novas viagens tenham sido adicionadas)
+    populateYearSelects();
 
     // 2. Calcular e Renderizar Alertas (CNH)
     renderCNHAlerts();
@@ -672,6 +820,9 @@ function renderDashboardKPIs() {
     document.getElementById("kpi-margin-desc").innerHTML = `Margem média de <span class="trend-up">${margin.toFixed(1)}%</span>`;
 }
 
+// Variável temporária para despesas extras no modal de edição
+let currentEditExpenses = [];
+
 function renderTripsTable() {
     const tbody = document.getElementById("tbody-trips");
     if (!tbody) return;
@@ -687,10 +838,12 @@ function renderTripsTable() {
     filteredTrips.forEach(t => {
         const totalCost = (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0) + (t.despesaExtra || 0);
         const profit = t.receita - totalCost;
-        const statusClass = t.status === "Concluída" ? "badge success" : "badge warning";
+        const statusClass = t.status === "Concluída" ? "badge success" : (t.status === "Cancelada" ? "badge danger" : "badge warning");
         const paymentClass = t.pago === "Pago" ? "badge success" : "badge warning";
 
         const tr = document.createElement("tr");
+        tr.className = "trip-row-clickable";
+        tr.setAttribute("data-trip-id", t.id);
         tr.innerHTML = `
             <td><strong>${formatDate(t.data)}</strong></td>
             <td><strong>${t.cliente}</strong></td>
@@ -704,51 +857,177 @@ function renderTripsTable() {
                 <span class="${paymentClass}">${t.pago}</span>
             </td>
             <td>
-                <select class="trip-status-select" data-id="${t.id}" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); margin-bottom: 4px; display: block;">
-                    <option value="Em Viagem" ${t.status === "Em Viagem" ? "selected" : ""}>Em Viagem</option>
-                    <option value="Concluída" ${t.status === "Concluída" ? "selected" : ""}>Concluída</option>
-                    <option value="Cancelada" ${t.status === "Cancelada" ? "selected" : ""}>Cancelada</option>
-                </select>
-                <select class="trip-payment-select" data-id="${t.id}" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); display: block;">
-                    <option value="Pago" ${t.pago === "Pago" ? "selected" : ""}>Pago</option>
-                    <option value="Pendente" ${t.pago === "Pendente" ? "selected" : ""}>Pendente</option>
-                </select>
-            </td>
-            <td style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
-                <button class="btn btn-secondary btn-add-expense" data-id="${t.id}" style="padding: 4px 8px; font-size:0.75rem;" title="Adicionar despesa extra">
-                    + Despesa
-                </button>
-                <button class="btn btn-danger btn-delete-trip" data-id="${t.id}" style="padding: 4px 8px; font-size:0.75rem;">
-                    Excluir
+                <button class="btn btn-secondary btn-open-detail" data-id="${t.id}" style="padding: 5px 12px; font-size:0.75rem;" title="Ver detalhes e editar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    Detalhes
                 </button>
             </td>
         `;
-        
-        // Add status change listener
-        tr.querySelector(".trip-status-select").addEventListener("change", async function() {
-            const id = this.getAttribute("data-id");
-            const newStatus = this.value;
-            await updateTripStatus(id, newStatus);
+
+        // Clique na linha inteira abre o detalhe
+        tr.addEventListener("click", (e) => {
+            // Não abrir se clicou num botão ou link
+            if (e.target.closest("button") || e.target.closest("a") || e.target.closest("select")) return;
+            openTripDetail(t.id);
         });
 
-        // Add payment status change listener
-        tr.querySelector(".trip-payment-select").addEventListener("change", async function() {
-            const id = this.getAttribute("data-id");
-            const newPayment = this.value;
-            await updateTripPayment(id, newPayment);
-        });
-
-        // Add expense listener
-        tr.querySelector(".btn-add-expense").addEventListener("click", async function() {
-            const id = this.getAttribute("data-id");
-            const extra = prompt("Digite o valor da despesa adicional (R$):");
-            if (extra !== null && !isNaN(parseFloat(extra))) {
-                await addExtraExpense(id, parseFloat(extra));
-            }
+        // Botão Detalhes
+        tr.querySelector(".btn-open-detail").addEventListener("click", (e) => {
+            e.stopPropagation();
+            openTripDetail(t.id);
         });
 
         tbody.appendChild(tr);
     });
+}
+
+function openTripDetail(tripId) {
+    const trip = appData.trips.find(t => t.id === tripId);
+    if (!trip) return;
+
+    // Preencher campos do formulário de edição
+    document.getElementById("edit_trip_id").value = trip.id;
+    document.getElementById("edit_trip_client").value = trip.cliente || "";
+    document.getElementById("edit_trip_date").value = trip.data || "";
+    document.getElementById("edit_trip_origin").value = trip.origem || "";
+    document.getElementById("edit_trip_destination").value = trip.destino || "";
+    document.getElementById("edit_trip_receita").value = trip.receita || 0;
+    document.getElementById("edit_trip_diesel").value = trip.combustivel || 0;
+    document.getElementById("edit_trip_tolls").value = trip.pedagio || 0;
+    document.getElementById("edit_trip_diarias").value = trip.diarias || 0;
+    document.getElementById("edit_trip_comission").value = trip.comissao || 0;
+    document.getElementById("edit_trip_maint").value = trip.manutencao || 0;
+    document.getElementById("edit_trip_status").value = trip.status || "Em Viagem";
+    document.getElementById("edit_trip_payment_status").value = trip.pago || "Pendente";
+    document.getElementById("edit_trip_payment_date").value = trip.dataRecebimento || "";
+
+    // Título dinâmico
+    document.getElementById("detail-modal-title").textContent = `${trip.cliente} — ${trip.origem} → ${trip.destino}`;
+
+    // Popular dropdowns de placa e motorista no modal de edição
+    populateEditDropdowns(trip.placa, trip.motorista);
+
+    // Carregar despesas extras existentes
+    currentEditExpenses = Array.isArray(trip.despesasExtras) ? [...trip.despesasExtras] : [];
+    // Se tem despesaExtra mas não tem array itemizado, criar um item genérico
+    if (currentEditExpenses.length === 0 && (trip.despesaExtra || 0) > 0) {
+        currentEditExpenses.push({ descricao: "Despesa extra (migrada)", valor: trip.despesaExtra });
+    }
+
+    renderDetailExpenses();
+    updateDetailSummary();
+
+    // Atualizar resumo ao alterar campos de valor
+    const valueFields = ["edit_trip_receita", "edit_trip_diesel", "edit_trip_tolls", "edit_trip_diarias", "edit_trip_comission", "edit_trip_maint"];
+    valueFields.forEach(fieldId => {
+        const el = document.getElementById(fieldId);
+        // Remover listener antigo clonando o nó
+        const newEl = el.cloneNode(true);
+        el.parentNode.replaceChild(newEl, el);
+        newEl.addEventListener("input", updateDetailSummary);
+    });
+
+    // Abrir modal
+    document.getElementById("modal-trip-detail").classList.add("active");
+}
+
+function populateEditDropdowns(selectedPlaca, selectedMotorista) {
+    const vehicleSelect = document.getElementById("edit_trip_vehicle");
+    const driverSelect = document.getElementById("edit_trip_driver");
+
+    if (vehicleSelect) {
+        vehicleSelect.innerHTML = '<option value="">Selecione a Placa</option>';
+        appData.vehicles.forEach(v => {
+            const selected = v.placa === selectedPlaca ? "selected" : "";
+            vehicleSelect.innerHTML += `<option value="${v.placa}" ${selected}>${v.placa} - ${v.modelo}</option>`;
+        });
+        // Se a placa atual não está nos veículos cadastrados, adicionar como opção
+        if (selectedPlaca && !appData.vehicles.find(v => v.placa === selectedPlaca)) {
+            vehicleSelect.innerHTML += `<option value="${selectedPlaca}" selected>${selectedPlaca} (não cadastrado)</option>`;
+        }
+    }
+
+    if (driverSelect) {
+        driverSelect.innerHTML = '<option value="">Selecione o Motorista</option>';
+        appData.drivers.forEach(d => {
+            const selected = d.nome === selectedMotorista ? "selected" : "";
+            driverSelect.innerHTML += `<option value="${d.nome}" ${selected}>${d.nome}</option>`;
+        });
+        // Se o motorista atual não está nos cadastrados, adicionar como opção
+        if (selectedMotorista && !appData.drivers.find(d => d.nome === selectedMotorista)) {
+            driverSelect.innerHTML += `<option value="${selectedMotorista}" selected>${selectedMotorista} (não cadastrado)</option>`;
+        }
+    }
+}
+
+function renderDetailExpenses() {
+    const container = document.getElementById("edit-expenses-list");
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (currentEditExpenses.length === 0) {
+        container.innerHTML = '<div class="detail-expenses-empty">Nenhuma despesa extra adicionada.</div>';
+    } else {
+        currentEditExpenses.forEach((expense, index) => {
+            const item = document.createElement("div");
+            item.className = "detail-expense-item";
+            item.innerHTML = `
+                <div class="expense-info">
+                    <span class="expense-desc">${expense.descricao}</span>
+                </div>
+                <div class="expense-info">
+                    <span class="expense-value">- ${formatBRL(expense.valor)}</span>
+                    <button type="button" class="btn-remove-expense" data-index="${index}" title="Remover despesa">✕</button>
+                </div>
+            `;
+
+            item.querySelector(".btn-remove-expense").addEventListener("click", () => {
+                currentEditExpenses.splice(index, 1);
+                renderDetailExpenses();
+                updateDetailSummary();
+            });
+
+            container.appendChild(item);
+        });
+    }
+
+    // Atualizar badge de total extras
+    const totalExtras = currentEditExpenses.reduce((sum, d) => sum + d.valor, 0);
+    const badge = document.getElementById("edit-total-extras");
+    if (badge) {
+        badge.textContent = `Total extras: ${formatBRL(totalExtras)}`;
+    }
+}
+
+function updateDetailSummary() {
+    const receita = parseFloat(document.getElementById("edit_trip_receita").value) || 0;
+    const diesel = parseFloat(document.getElementById("edit_trip_diesel").value) || 0;
+    const pedagio = parseFloat(document.getElementById("edit_trip_tolls").value) || 0;
+    const diarias = parseFloat(document.getElementById("edit_trip_diarias").value) || 0;
+    const comissao = parseFloat(document.getElementById("edit_trip_comission").value) || 0;
+    const manutencao = parseFloat(document.getElementById("edit_trip_maint").value) || 0;
+    const totalExtras = currentEditExpenses.reduce((sum, d) => sum + d.valor, 0);
+
+    const totalCustos = diesel + pedagio + diarias + comissao + manutencao + totalExtras;
+    const lucro = receita - totalCustos;
+
+    const container = document.getElementById("edit-financial-summary");
+    if (container) {
+        container.innerHTML = `
+            <div class="summary-card">
+                <div class="summary-label">Receita Bruta</div>
+                <div class="summary-value neutral">${formatBRL(receita)}</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Custos Totais</div>
+                <div class="summary-value negative">${formatBRL(totalCustos)}</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Saldo Líquido</div>
+                <div class="summary-value ${lucro >= 0 ? 'positive' : 'negative'}">${formatBRL(lucro)}</div>
+            </div>
+        `;
+    }
 }
 
 function renderReceivablesTable() {

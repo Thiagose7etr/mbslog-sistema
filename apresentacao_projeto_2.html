@@ -627,14 +627,163 @@ tr:hover td {
     color: var(--text-primary);
 }
 
+/* Trip Detail Modal - Expenses Section */
+.detail-expenses-section {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 8px;
+    margin-bottom: 20px;
+}
+
+.detail-expenses-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.detail-expenses-header h4 {
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--brand-primary);
+}
+
+.detail-expenses-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.detail-expense-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.88rem;
+    transition: background-color 0.15s ease;
+}
+
+.detail-expense-item:hover {
+    background-color: var(--bg-hover);
+}
+
+.detail-expense-item .expense-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.detail-expense-item .expense-desc {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.detail-expense-item .expense-value {
+    color: var(--danger);
+    font-weight: 600;
+    font-family: var(--font-heading);
+}
+
+.detail-expense-item .btn-remove-expense {
+    background: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--danger);
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.detail-expense-item .btn-remove-expense:hover {
+    background-color: rgba(239, 68, 68, 0.15);
+    border-color: var(--danger);
+}
+
+.detail-add-expense-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.detail-expenses-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    padding: 12px;
+    font-style: italic;
+}
+
+/* Financial Summary in Detail Modal */
+.detail-financial-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 0;
+    margin-bottom: 4px;
+}
+
+.summary-card {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+}
+
+.summary-card .summary-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.summary-card .summary-value {
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.summary-card .summary-value.positive {
+    color: var(--brand-primary);
+}
+
+.summary-card .summary-value.negative {
+    color: var(--danger);
+}
+
+.summary-card .summary-value.neutral {
+    color: var(--text-primary);
+}
+
+/* Clickable Trip Rows */
+tr.trip-row-clickable {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+tr.trip-row-clickable:hover td {
+    background-color: rgba(43, 226, 230, 0.04) !important;
+}
+
 </style>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚚</text></svg>">
     <!-- Chart.js para renderização de gráficos financeiros -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- SDKs do Firebase Compat para permitir execução local sem problemas de CORS de Módulos ES6 -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- Supabase JS Client para Banco em Nuvem em Tempo Real (Padrão Vercel / Thcontrol) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -725,7 +874,6 @@ tr:hover td {
                     </div>
                     <button class="btn btn-secondary" id="btn-clear-filters" style="padding: 6px 14px; font-size: 0.8rem;">Limpar Filtros</button>
                     <span class="badge info" style="font-weight: 600; background: rgba(43, 226, 230, 0.15); border: 1px solid var(--brand-primary); color: var(--brand-primary);">Cliente: MBSLOG</span>
-                    <span id="db-status" class="badge info">Carregando...</span>
                 </div>
             </div>
 
@@ -1218,28 +1366,141 @@ tr:hover td {
         </div>
     </div>
 
+    <!-- Modal Detalhes / Edição de Viagem -->
+    <div class="modal-overlay" id="modal-trip-detail">
+        <div class="modal-box" style="max-width: 850px;">
+            <div class="modal-header">
+                <h3 id="detail-modal-title">Detalhes da Viagem</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="form-trip-edit">
+                <input type="hidden" id="edit_trip_id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="edit_trip_client">Cliente Faturado</label>
+                        <input type="text" id="edit_trip_client" required placeholder="Ex: Ambev SA">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_date">Data da Viagem</label>
+                        <input type="date" id="edit_trip_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_origin">Origem</label>
+                        <input type="text" id="edit_trip_origin" required placeholder="Ex: São Paulo - SP">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_destination">Destino</label>
+                        <input type="text" id="edit_trip_destination" required placeholder="Ex: Porto Alegre - RS">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_vehicle">Placa do Veículo</label>
+                        <select id="edit_trip_vehicle" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_driver">Motorista Escalado</label>
+                        <select id="edit_trip_driver" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_receita">Valor Bruto do Frete (Receita)</label>
+                        <input type="number" id="edit_trip_receita" required min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_diesel">Despesa: Combustível (Diesel)</label>
+                        <input type="number" id="edit_trip_diesel" min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_tolls">Despesa: Pedágios</label>
+                        <input type="number" id="edit_trip_tolls" min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_diarias">Despesa: Diárias / Alimentação</label>
+                        <input type="number" id="edit_trip_diarias" min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_comission">Despesa: Comissão do Motorista</label>
+                        <input type="number" id="edit_trip_comission" min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_maint">Despesa: Manutenção em Rota</label>
+                        <input type="number" id="edit_trip_maint" min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_status">Status da Viagem</label>
+                        <select id="edit_trip_status" required>
+                            <option value="Em Viagem">Em Viagem (Operacional)</option>
+                            <option value="Concluída">Concluída (Finalizada)</option>
+                            <option value="Cancelada">Cancelada</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_payment_status">Status de Pagamento</label>
+                        <select id="edit_trip_payment_status" required>
+                            <option value="Pago">Pago (Faturado/Recebido)</option>
+                            <option value="Pendente">Pendente (A Receber)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_payment_date">Previsão de Recebimento</label>
+                        <input type="date" id="edit_trip_payment_date">
+                    </div>
+                </div>
+
+                <!-- Seção de Despesas Extras Itemizadas -->
+                <div class="detail-expenses-section">
+                    <div class="detail-expenses-header">
+                        <h4>Despesas Extras da Viagem</h4>
+                        <span class="badge info" id="edit-total-extras">Total extras: R$ 0,00</span>
+                    </div>
+                    <div id="edit-expenses-list" class="detail-expenses-list">
+                        <!-- Despesas extras renderizadas dinamicamente -->
+                    </div>
+                    <div class="detail-add-expense-row">
+                        <input type="text" id="edit_expense_desc" placeholder="Descrição (ex: Pneu furado, Multa...)" style="flex: 2;">
+                        <input type="number" id="edit_expense_value" placeholder="Valor R$" min="0" step="0.01" style="flex: 1;">
+                        <button type="button" class="btn" id="btn-add-detail-expense" style="padding: 8px 16px; white-space: nowrap;">
+                            + Adicionar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Resumo Financeiro -->
+                <div class="detail-financial-summary" id="edit-financial-summary">
+                    <!-- Calculado dinamicamente -->
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+                    <button type="button" class="btn btn-danger" id="btn-delete-from-detail" style="margin-right: auto;">Excluir Viagem</button>
+                    <button class="btn btn-secondary btn-cancel">Cancelar</button>
+                    <button type="submit" class="btn">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- CONFIGURAÇÕES DE DB E INICIALIZAÇÃO -->
-    <script src="config-db.js"></script>
+    <script>
+// CONFIGURAÇÃO DO BANCO DE DADOS EM NUVEM (SUPABASE / VERCEL - VAYKO LABS)
+//
+// Credenciais do projeto Supabase conectado à Vercel.
+
+const SUPABASE_URL = "https://kwivvvenqqfchrczoyou.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3aXZ2dmVucXFmY2hyY3pveW91Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMjg5MjIsImV4cCI6MjEwNjYwNDkyMn0.eeH6UjHjaG0JYJveA4oCVIvdo2aoUSOjU-5CpE2Z0fI";
+
+// Indica se o Supabase deve ser ativado ou se rodará em LocalStorage
+const USE_SUPABASE = SUPABASE_URL.trim() !== "" && SUPABASE_ANON_KEY.trim() !== "";
+
+</script>
     <script>
 // Massa de dados fictícios para inicializar o sistema localmente (Seed Data)
-const SEED_VEHICLES = [
-    { id: "v1", placa: "MBS-1020", modelo: "Volvo FH 540 (Carreta)", tipo: "Carreta / Bitrem", propriedade: "Própria" },
-    { id: "v2", placa: "MBS-3040", modelo: "Scania R450 (Bitrem)", tipo: "Carreta / Bitrem", propriedade: "Própria" },
-    { id: "v3", placa: "ARG-8899", modelo: "Mercedes Axor 2544 (Terceirizado)", tipo: "Caminhão Truck (3 eixos)", propriedade: "Terceirizada" }
-];
+const SEED_VEHICLES = [];
 
-const SEED_DRIVERS = [
-    { id: "d1", nome: "Marcos Borges", cnh: "12345678910", categoria: "AE", validade: getRelativeDate(-15) }, // Vencida (Alerta de perigo)
-    { id: "d2", nome: "Carlos Henrique", cnh: "98765432100", categoria: "E", validade: getRelativeDate(20) },  // Vencendo em 20 dias (Aviso)
-    { id: "d3", nome: "Rogério Silva", cnh: "55566677788", categoria: "D", validade: getRelativeDate(250) }   // Ok
-];
+const SEED_DRIVERS = [];
 
-const SEED_TRIPS = [
-    { id: "t1", cliente: "Ambev SA", origem: "São Paulo - SP", destino: "Rio de Janeiro - RJ", placa: "MBS-1020", motorista: "Marcos Borges", receita: 4500, combustivel: 1200, pedagio: 350, diarias: 250, comissao: 500, manutencao: 0, status: "Concluída", data: getRelativeDate(-8), pago: "Pago", dataRecebimento: "" },
-    { id: "t2", cliente: "Coca-Cola FEMSA", origem: "Campinas - SP", destino: "Belo Horizonte - MG", placa: "MBS-3040", motorista: "Carlos Henrique", receita: 5800, combustivel: 1600, pedagio: 450, diarias: 300, comissao: 650, manutencao: 0, status: "Concluída", data: getRelativeDate(-5), pago: "Pago", dataRecebimento: "" },
-    { id: "t3", cliente: "JBS Alimentos", origem: "Ribeirão Preto - SP", destino: "Curitiba - PR", placa: "ARG-8899", motorista: "Rogério Silva", receita: 7200, combustivel: 2100, pedagio: 600, diarias: 400, comissao: 800, manutencao: 350, status: "Em Viagem", data: getRelativeDate(-2), pago: "Pendente", dataRecebimento: getRelativeDate(5) },
-    { id: "t4", cliente: "Ambev SA", origem: "São Paulo - SP", destino: "Campinas - SP", placa: "MBS-1020", motorista: "Marcos Borges", receita: 1800, combustivel: 450, pedagio: 120, diarias: 100, comissao: 200, manutencao: 0, status: "Concluída", data: getRelativeDate(-12), pago: "Pendente", dataRecebimento: getRelativeDate(12) }
-];
+const SEED_TRIPS = [];
 
 // Helper para gerar datas dinâmicas relativas a hoje
 function getRelativeDate(daysOffset) {
@@ -1319,40 +1580,111 @@ function getFilteredTrips() {
     });
 }
 
-if (USE_FIREBASE) {
+let supabaseClient = null;
+
+if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE) {
     try {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        console.log("Firebase conectado com sucesso!");
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("Supabase conectado com sucesso!");
 
-        // Escuta em tempo real para coleções no Firestore usando API Compat
-        db.collection("vehicles").onSnapshot((snapshot) => {
-            appData.vehicles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            onDataChangedCallback();
-        }, (error) => {
-            console.error("Erro ao sincronizar veículos:", error);
-        });
-        
-        db.collection("drivers").onSnapshot((snapshot) => {
-            appData.drivers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            onDataChangedCallback();
-        }, (error) => {
-            console.error("Erro ao sincronizar motoristas:", error);
-        });
+        // Carregar dados iniciais da nuvem
+        loadSupabaseData();
 
-        db.collection("trips").onSnapshot((snapshot) => {
-            appData.trips = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            onDataChangedCallback();
-        }, (error) => {
-            console.error("Erro ao sincronizar viagens:", error);
-        });
+        // Escuta em tempo real para coleções no Supabase (Realtime)
+        supabaseClient.channel('realtime-vayko-fleet')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, () => loadVehiclesFromSupabase())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => loadDriversFromSupabase())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => loadTripsFromSupabase())
+            .subscribe();
+
     } catch (error) {
-        console.error("Falha ao inicializar o Firebase. Usando LocalStorage fallback.", error);
+        console.error("Falha ao inicializar o Supabase. Usando LocalStorage fallback.", error);
         initializeLocalStorage();
     }
 } else {
     console.log("Utilizando modo de Demonstração Local (LocalStorage).");
     initializeLocalStorage();
+}
+
+async function loadSupabaseData() {
+    await Promise.all([
+        loadVehiclesFromSupabase(),
+        loadDriversFromSupabase(),
+        loadTripsFromSupabase()
+    ]);
+}
+
+async function loadVehiclesFromSupabase() {
+    if (!supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient.from('vehicles').select('*');
+        if (!error && data) {
+            if (data.length > 0) {
+                appData.vehicles = data;
+                onDataChangedCallback();
+            } else {
+                // Popular tabela com dados de semente se estiver vazia
+                for (const v of SEED_VEHICLES) {
+                    await supabaseClient.from('vehicles').insert([v]);
+                }
+                const res = await supabaseClient.from('vehicles').select('*');
+                if (res.data) {
+                    appData.vehicles = res.data;
+                    onDataChangedCallback();
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Erro ao buscar veículos no Supabase:", e);
+    }
+}
+
+async function loadDriversFromSupabase() {
+    if (!supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient.from('drivers').select('*');
+        if (!error && data) {
+            if (data.length > 0) {
+                appData.drivers = data;
+                onDataChangedCallback();
+            } else {
+                for (const d of SEED_DRIVERS) {
+                    await supabaseClient.from('drivers').insert([d]);
+                }
+                const res = await supabaseClient.from('drivers').select('*');
+                if (res.data) {
+                    appData.drivers = res.data;
+                    onDataChangedCallback();
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Erro ao buscar motoristas no Supabase:", e);
+    }
+}
+
+async function loadTripsFromSupabase() {
+    if (!supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient.from('trips').select('*');
+        if (!error && data) {
+            if (data.length > 0) {
+                appData.trips = data;
+                onDataChangedCallback();
+            } else {
+                for (const t of SEED_TRIPS) {
+                    await supabaseClient.from('trips').insert([t]);
+                }
+                const res = await supabaseClient.from('trips').select('*');
+                if (res.data) {
+                    appData.trips = res.data;
+                    onDataChangedCallback();
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Erro ao buscar viagens no Supabase:", e);
+    }
 }
 
 function initializeLocalStorage() {
@@ -1382,11 +1714,12 @@ function initializeLocalStorage() {
     setTimeout(() => { onDataChangedCallback(); }, 100);
 }
 
-// Operações de Escrita (CRUD) abstratas para lidar com Cloud ou LocalStorage
+// Operações de Escrita (CRUD) abstratas para lidar com Cloud (Supabase) ou LocalStorage
 async function addVehicle(vehicle) {
     vehicle.id = "v_" + Date.now();
-    if (USE_FIREBASE && db) {
-        await db.collection("vehicles").add(vehicle);
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('vehicles').insert([vehicle]);
+        await loadVehiclesFromSupabase();
     } else {
         appData.vehicles.push(vehicle);
         localStorage.setItem("mbslog_vehicles", JSON.stringify(appData.vehicles));
@@ -1396,8 +1729,9 @@ async function addVehicle(vehicle) {
 
 async function addDriver(driver) {
     driver.id = "d_" + Date.now();
-    if (USE_FIREBASE && db) {
-        await db.collection("drivers").add(driver);
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('drivers').insert([driver]);
+        await loadDriversFromSupabase();
     } else {
         appData.drivers.push(driver);
         localStorage.setItem("mbslog_drivers", JSON.stringify(appData.drivers));
@@ -1415,8 +1749,9 @@ async function addTrip(trip) {
     trip.comissao = parseFloat(trip.comissao) || 0;
     trip.manutencao = parseFloat(trip.manutencao) || 0;
 
-    if (USE_FIREBASE && db) {
-        await db.collection("trips").add(trip);
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('trips').insert([trip]);
+        await loadTripsFromSupabase();
     } else {
         appData.trips.push(trip);
         localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
@@ -1425,13 +1760,9 @@ async function addTrip(trip) {
 }
 
 async function removeVehicle(id) {
-    if (USE_FIREBASE && db) {
-        const querySnapshot = await db.collection("vehicles").get();
-        querySnapshot.forEach(async (docRef) => {
-            if (docRef.data().id === id || docRef.id === id) {
-                await db.collection("vehicles").doc(docRef.id).delete();
-            }
-        });
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('vehicles').delete().eq('id', id);
+        await loadVehiclesFromSupabase();
     } else {
         appData.vehicles = appData.vehicles.filter(v => v.id !== id);
         localStorage.setItem("mbslog_vehicles", JSON.stringify(appData.vehicles));
@@ -1440,13 +1771,9 @@ async function removeVehicle(id) {
 }
 
 async function removeDriver(id) {
-    if (USE_FIREBASE && db) {
-        const querySnapshot = await db.collection("drivers").get();
-        querySnapshot.forEach(async (docRef) => {
-            if (docRef.data().id === id || docRef.id === id) {
-                await db.collection("drivers").doc(docRef.id).delete();
-            }
-        });
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('drivers').delete().eq('id', id);
+        await loadDriversFromSupabase();
     } else {
         appData.drivers = appData.drivers.filter(d => d.id !== id);
         localStorage.setItem("mbslog_drivers", JSON.stringify(appData.drivers));
@@ -1455,15 +1782,88 @@ async function removeDriver(id) {
 }
 
 async function removeTrip(id) {
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('trips').delete().eq('id', id);
+        await loadTripsFromSupabase();
+    } else {
+        appData.trips = appData.trips.filter(t => t.id !== id);
+        localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
+        onDataChangedCallback();
+    }
+}
+
+async function updateTripStatus(id, newStatus) {
     if (USE_FIREBASE && db) {
         const querySnapshot = await db.collection("trips").get();
         querySnapshot.forEach(async (docRef) => {
             if (docRef.data().id === id || docRef.id === id) {
-                await db.collection("trips").doc(docRef.id).delete();
+                await db.collection("trips").doc(docRef.id).update({ status: newStatus });
             }
         });
     } else {
-        appData.trips = appData.trips.filter(t => t.id !== id);
+        appData.trips = appData.trips.map(t => {
+            if (t.id === id) t.status = newStatus;
+            return t;
+        });
+        localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
+        onDataChangedCallback();
+    }
+}
+
+async function updateTripPayment(id, newPayment) {
+    if (USE_FIREBASE && db) {
+        const querySnapshot = await db.collection("trips").get();
+        querySnapshot.forEach(async (docRef) => {
+            if (docRef.data().id === id || docRef.id === id) {
+                await db.collection("trips").doc(docRef.id).update({ pago: newPayment });
+            }
+        });
+    } else {
+        appData.trips = appData.trips.map(t => {
+            if (t.id === id) t.pago = newPayment;
+            return t;
+        });
+        localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
+        onDataChangedCallback();
+    }
+}
+
+async function addExtraExpense(id, amount) {
+    if (USE_FIREBASE && db) {
+        const querySnapshot = await db.collection("trips").get();
+        querySnapshot.forEach(async (docRef) => {
+            if (docRef.data().id === id || docRef.id === id) {
+                const currentExtra = docRef.data().despesaExtra || 0;
+                await db.collection("trips").doc(docRef.id).update({ despesaExtra: currentExtra + amount });
+            }
+        });
+    } else {
+        appData.trips = appData.trips.map(t => {
+            if (t.id === id) {
+                t.despesaExtra = (t.despesaExtra || 0) + amount;
+            }
+            return t;
+        });
+        localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
+        onDataChangedCallback();
+    }
+}
+
+async function updateTrip(id, updatedData) {
+    if (USE_FIREBASE && db) {
+        const querySnapshot = await db.collection("trips").get();
+        querySnapshot.forEach(async (docRef) => {
+            if (docRef.data().id === id || docRef.id === id) {
+                await db.collection("trips").doc(docRef.id).update(updatedData);
+            }
+        });
+    } else {
+        appData.trips = appData.trips.map(t => {
+            if (t.id === id) {
+                return { ...t, ...updatedData };
+            }
+            return t;
+        });
         localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
         onDataChangedCallback();
     }
@@ -1548,6 +1948,41 @@ function setupModals() {
             btn.closest(".modal-overlay").classList.remove("active");
         });
     });
+
+    // Botão adicionar despesa extra no modal de detalhes
+    const btnAddDetailExpense = document.getElementById("btn-add-detail-expense");
+    if (btnAddDetailExpense) {
+        btnAddDetailExpense.addEventListener("click", () => {
+            const descInput = document.getElementById("edit_expense_desc");
+            const valueInput = document.getElementById("edit_expense_value");
+            const desc = descInput.value.trim();
+            const value = parseFloat(valueInput.value);
+
+            if (!desc || isNaN(value) || value <= 0) {
+                alert("Preencha a descrição e um valor válido para a despesa.");
+                return;
+            }
+
+            // Adicionar ao array temporário de despesas extras
+            currentEditExpenses.push({ descricao: desc, valor: value });
+            descInput.value = "";
+            valueInput.value = "";
+            renderDetailExpenses();
+            updateDetailSummary();
+        });
+    }
+
+    // Botão excluir viagem a partir do modal de detalhes
+    const btnDeleteFromDetail = document.getElementById("btn-delete-from-detail");
+    if (btnDeleteFromDetail) {
+        btnDeleteFromDetail.addEventListener("click", async () => {
+            const tripId = document.getElementById("edit_trip_id").value;
+            if (confirm("Tem certeza que deseja excluir esta viagem permanentemente?")) {
+                await removeTrip(tripId);
+                document.getElementById("modal-trip-detail").classList.remove("active");
+            }
+        });
+    }
 }
 
 function populateDropdowns() {
@@ -1596,6 +2031,37 @@ function setupFormSubmits() {
             await addTrip(formData);
             tripForm.reset();
             document.getElementById("modal-trip").classList.remove("active");
+        });
+    }
+
+    // Editar Viagem (modal de detalhes)
+    const editForm = document.getElementById("form-trip-edit");
+    if (editForm) {
+        editForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const tripId = document.getElementById("edit_trip_id").value;
+            const updatedData = {
+                cliente: document.getElementById("edit_trip_client").value,
+                data: document.getElementById("edit_trip_date").value,
+                origem: document.getElementById("edit_trip_origin").value,
+                destino: document.getElementById("edit_trip_destination").value,
+                placa: document.getElementById("edit_trip_vehicle").value,
+                motorista: document.getElementById("edit_trip_driver").value,
+                receita: parseFloat(document.getElementById("edit_trip_receita").value) || 0,
+                combustivel: parseFloat(document.getElementById("edit_trip_diesel").value) || 0,
+                pedagio: parseFloat(document.getElementById("edit_trip_tolls").value) || 0,
+                diarias: parseFloat(document.getElementById("edit_trip_diarias").value) || 0,
+                comissao: parseFloat(document.getElementById("edit_trip_comission").value) || 0,
+                manutencao: parseFloat(document.getElementById("edit_trip_maint").value) || 0,
+                status: document.getElementById("edit_trip_status").value,
+                pago: document.getElementById("edit_trip_payment_status").value,
+                dataRecebimento: document.getElementById("edit_trip_payment_date").value || "",
+                despesasExtras: currentEditExpenses,
+                despesaExtra: currentEditExpenses.reduce((sum, d) => sum + d.valor, 0)
+            };
+
+            await updateTrip(tripId, updatedData);
+            document.getElementById("modal-trip-detail").classList.remove("active");
         });
     }
 
@@ -1737,20 +2203,20 @@ function populateYearSelects() {
 // RENDERIZAÇÃO DA TELA E CÁLCULO DE RELATÓRIOS
 // -------------------------------------------------------------
 function updateUI() {
-    // 0. Atualizar opções de ano nos filtros (caso novas viagens tenham sido adicionadas)
-    populateYearSelects();
-
-    // 1. Atualizar Painel de Banco de Dados / Nuvem
+    // 0. Atualizar Status do Banco de Dados
     const dbStatus = document.getElementById("db-status");
     if (dbStatus) {
-        if (USE_FIREBASE) {
+        if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE) {
             dbStatus.className = "badge success";
-            dbStatus.textContent = "NUVEM CLOUD (FIRESTORE) CONECTADO";
+            dbStatus.textContent = "NUVEM SUPABASE CONECTADA";
         } else {
             dbStatus.className = "badge warning";
             dbStatus.textContent = "DEMONSTRAÇÃO LOCAL (LOCALSTORAGE)";
         }
     }
+
+    // Atualizar opções de ano nos filtros (caso novas viagens tenham sido adicionadas)
+    populateYearSelects();
 
     // 2. Calcular e Renderizar Alertas (CNH)
     renderCNHAlerts();
@@ -1823,7 +2289,7 @@ function renderDashboardKPIs() {
 
     filteredTrips.forEach(t => {
         totalRevenue += t.receita || 0;
-        totalExpenses += (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0);
+        totalExpenses += (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0) + (t.despesaExtra || 0);
         if (t.pago === "Pendente") {
             totalReceivables += t.receita || 0;
         }
@@ -1851,6 +2317,9 @@ function renderDashboardKPIs() {
     document.getElementById("kpi-margin-desc").innerHTML = `Margem média de <span class="trend-up">${margin.toFixed(1)}%</span>`;
 }
 
+// Variável temporária para despesas extras no modal de edição
+let currentEditExpenses = [];
+
 function renderTripsTable() {
     const tbody = document.getElementById("tbody-trips");
     if (!tbody) return;
@@ -1864,12 +2333,14 @@ function renderTripsTable() {
     }
 
     filteredTrips.forEach(t => {
-        const totalCost = (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0);
+        const totalCost = (t.combustivel || 0) + (t.pedagio || 0) + (t.diarias || 0) + (t.comissao || 0) + (t.manutencao || 0) + (t.despesaExtra || 0);
         const profit = t.receita - totalCost;
-        const statusClass = t.status === "Concluída" ? "badge success" : "badge warning";
+        const statusClass = t.status === "Concluída" ? "badge success" : (t.status === "Cancelada" ? "badge danger" : "badge warning");
         const paymentClass = t.pago === "Pago" ? "badge success" : "badge warning";
 
         const tr = document.createElement("tr");
+        tr.className = "trip-row-clickable";
+        tr.setAttribute("data-trip-id", t.id);
         tr.innerHTML = `
             <td><strong>${formatDate(t.data)}</strong></td>
             <td><strong>${t.cliente}</strong></td>
@@ -1883,22 +2354,177 @@ function renderTripsTable() {
                 <span class="${paymentClass}">${t.pago}</span>
             </td>
             <td>
-                <button class="btn btn-danger btn-delete-trip" data-id="${t.id}" style="padding: 4px 8px; font-size:0.75rem;">
-                    Excluir
+                <button class="btn btn-secondary btn-open-detail" data-id="${t.id}" style="padding: 5px 12px; font-size:0.75rem;" title="Ver detalhes e editar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    Detalhes
                 </button>
             </td>
         `;
-        
-        // Add event delete listener
-        tr.querySelector(".btn-delete-trip").addEventListener("click", async function() {
-            if (confirm("Tem certeza que deseja excluir esta viagem?")) {
-                const id = this.getAttribute("data-id");
-                await removeTrip(id);
-            }
+
+        // Clique na linha inteira abre o detalhe
+        tr.addEventListener("click", (e) => {
+            // Não abrir se clicou num botão ou link
+            if (e.target.closest("button") || e.target.closest("a") || e.target.closest("select")) return;
+            openTripDetail(t.id);
+        });
+
+        // Botão Detalhes
+        tr.querySelector(".btn-open-detail").addEventListener("click", (e) => {
+            e.stopPropagation();
+            openTripDetail(t.id);
         });
 
         tbody.appendChild(tr);
     });
+}
+
+function openTripDetail(tripId) {
+    const trip = appData.trips.find(t => t.id === tripId);
+    if (!trip) return;
+
+    // Preencher campos do formulário de edição
+    document.getElementById("edit_trip_id").value = trip.id;
+    document.getElementById("edit_trip_client").value = trip.cliente || "";
+    document.getElementById("edit_trip_date").value = trip.data || "";
+    document.getElementById("edit_trip_origin").value = trip.origem || "";
+    document.getElementById("edit_trip_destination").value = trip.destino || "";
+    document.getElementById("edit_trip_receita").value = trip.receita || 0;
+    document.getElementById("edit_trip_diesel").value = trip.combustivel || 0;
+    document.getElementById("edit_trip_tolls").value = trip.pedagio || 0;
+    document.getElementById("edit_trip_diarias").value = trip.diarias || 0;
+    document.getElementById("edit_trip_comission").value = trip.comissao || 0;
+    document.getElementById("edit_trip_maint").value = trip.manutencao || 0;
+    document.getElementById("edit_trip_status").value = trip.status || "Em Viagem";
+    document.getElementById("edit_trip_payment_status").value = trip.pago || "Pendente";
+    document.getElementById("edit_trip_payment_date").value = trip.dataRecebimento || "";
+
+    // Título dinâmico
+    document.getElementById("detail-modal-title").textContent = `${trip.cliente} — ${trip.origem} → ${trip.destino}`;
+
+    // Popular dropdowns de placa e motorista no modal de edição
+    populateEditDropdowns(trip.placa, trip.motorista);
+
+    // Carregar despesas extras existentes
+    currentEditExpenses = Array.isArray(trip.despesasExtras) ? [...trip.despesasExtras] : [];
+    // Se tem despesaExtra mas não tem array itemizado, criar um item genérico
+    if (currentEditExpenses.length === 0 && (trip.despesaExtra || 0) > 0) {
+        currentEditExpenses.push({ descricao: "Despesa extra (migrada)", valor: trip.despesaExtra });
+    }
+
+    renderDetailExpenses();
+    updateDetailSummary();
+
+    // Atualizar resumo ao alterar campos de valor
+    const valueFields = ["edit_trip_receita", "edit_trip_diesel", "edit_trip_tolls", "edit_trip_diarias", "edit_trip_comission", "edit_trip_maint"];
+    valueFields.forEach(fieldId => {
+        const el = document.getElementById(fieldId);
+        // Remover listener antigo clonando o nó
+        const newEl = el.cloneNode(true);
+        el.parentNode.replaceChild(newEl, el);
+        newEl.addEventListener("input", updateDetailSummary);
+    });
+
+    // Abrir modal
+    document.getElementById("modal-trip-detail").classList.add("active");
+}
+
+function populateEditDropdowns(selectedPlaca, selectedMotorista) {
+    const vehicleSelect = document.getElementById("edit_trip_vehicle");
+    const driverSelect = document.getElementById("edit_trip_driver");
+
+    if (vehicleSelect) {
+        vehicleSelect.innerHTML = '<option value="">Selecione a Placa</option>';
+        appData.vehicles.forEach(v => {
+            const selected = v.placa === selectedPlaca ? "selected" : "";
+            vehicleSelect.innerHTML += `<option value="${v.placa}" ${selected}>${v.placa} - ${v.modelo}</option>`;
+        });
+        // Se a placa atual não está nos veículos cadastrados, adicionar como opção
+        if (selectedPlaca && !appData.vehicles.find(v => v.placa === selectedPlaca)) {
+            vehicleSelect.innerHTML += `<option value="${selectedPlaca}" selected>${selectedPlaca} (não cadastrado)</option>`;
+        }
+    }
+
+    if (driverSelect) {
+        driverSelect.innerHTML = '<option value="">Selecione o Motorista</option>';
+        appData.drivers.forEach(d => {
+            const selected = d.nome === selectedMotorista ? "selected" : "";
+            driverSelect.innerHTML += `<option value="${d.nome}" ${selected}>${d.nome}</option>`;
+        });
+        // Se o motorista atual não está nos cadastrados, adicionar como opção
+        if (selectedMotorista && !appData.drivers.find(d => d.nome === selectedMotorista)) {
+            driverSelect.innerHTML += `<option value="${selectedMotorista}" selected>${selectedMotorista} (não cadastrado)</option>`;
+        }
+    }
+}
+
+function renderDetailExpenses() {
+    const container = document.getElementById("edit-expenses-list");
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (currentEditExpenses.length === 0) {
+        container.innerHTML = '<div class="detail-expenses-empty">Nenhuma despesa extra adicionada.</div>';
+    } else {
+        currentEditExpenses.forEach((expense, index) => {
+            const item = document.createElement("div");
+            item.className = "detail-expense-item";
+            item.innerHTML = `
+                <div class="expense-info">
+                    <span class="expense-desc">${expense.descricao}</span>
+                </div>
+                <div class="expense-info">
+                    <span class="expense-value">- ${formatBRL(expense.valor)}</span>
+                    <button type="button" class="btn-remove-expense" data-index="${index}" title="Remover despesa">✕</button>
+                </div>
+            `;
+
+            item.querySelector(".btn-remove-expense").addEventListener("click", () => {
+                currentEditExpenses.splice(index, 1);
+                renderDetailExpenses();
+                updateDetailSummary();
+            });
+
+            container.appendChild(item);
+        });
+    }
+
+    // Atualizar badge de total extras
+    const totalExtras = currentEditExpenses.reduce((sum, d) => sum + d.valor, 0);
+    const badge = document.getElementById("edit-total-extras");
+    if (badge) {
+        badge.textContent = `Total extras: ${formatBRL(totalExtras)}`;
+    }
+}
+
+function updateDetailSummary() {
+    const receita = parseFloat(document.getElementById("edit_trip_receita").value) || 0;
+    const diesel = parseFloat(document.getElementById("edit_trip_diesel").value) || 0;
+    const pedagio = parseFloat(document.getElementById("edit_trip_tolls").value) || 0;
+    const diarias = parseFloat(document.getElementById("edit_trip_diarias").value) || 0;
+    const comissao = parseFloat(document.getElementById("edit_trip_comission").value) || 0;
+    const manutencao = parseFloat(document.getElementById("edit_trip_maint").value) || 0;
+    const totalExtras = currentEditExpenses.reduce((sum, d) => sum + d.valor, 0);
+
+    const totalCustos = diesel + pedagio + diarias + comissao + manutencao + totalExtras;
+    const lucro = receita - totalCustos;
+
+    const container = document.getElementById("edit-financial-summary");
+    if (container) {
+        container.innerHTML = `
+            <div class="summary-card">
+                <div class="summary-label">Receita Bruta</div>
+                <div class="summary-value neutral">${formatBRL(receita)}</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Custos Totais</div>
+                <div class="summary-value negative">${formatBRL(totalCustos)}</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Saldo Líquido</div>
+                <div class="summary-value ${lucro >= 0 ? 'positive' : 'negative'}">${formatBRL(lucro)}</div>
+            </div>
+        `;
+    }
 }
 
 function renderReceivablesTable() {

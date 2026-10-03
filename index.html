@@ -10,9 +10,8 @@
     <!-- Chart.js para renderização de gráficos financeiros -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- SDKs do Firebase Compat para permitir execução local sem problemas de CORS de Módulos ES6 -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- Supabase JS Client para Banco em Nuvem em Tempo Real (Padrão Vercel / Thcontrol) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -103,7 +102,6 @@
                     </div>
                     <button class="btn btn-secondary" id="btn-clear-filters" style="padding: 6px 14px; font-size: 0.8rem;">Limpar Filtros</button>
                     <span class="badge info" style="font-weight: 600; background: rgba(43, 226, 230, 0.15); border: 1px solid var(--brand-primary); color: var(--brand-primary);">Cliente: MBSLOG</span>
-                    <span id="db-status" class="badge info">Carregando...</span>
                 </div>
             </div>
 
@@ -591,6 +589,121 @@
                 <div style="display: flex; justify-content: flex-end; gap: 12px;">
                     <button class="btn btn-secondary btn-cancel">Cancelar</button>
                     <button type="submit" class="btn">Salvar Motorista</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Detalhes / Edição de Viagem -->
+    <div class="modal-overlay" id="modal-trip-detail">
+        <div class="modal-box" style="max-width: 850px;">
+            <div class="modal-header">
+                <h3 id="detail-modal-title">Detalhes da Viagem</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="form-trip-edit">
+                <input type="hidden" id="edit_trip_id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="edit_trip_client">Cliente Faturado</label>
+                        <input type="text" id="edit_trip_client" required placeholder="Ex: Ambev SA">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_date">Data da Viagem</label>
+                        <input type="date" id="edit_trip_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_origin">Origem</label>
+                        <input type="text" id="edit_trip_origin" required placeholder="Ex: São Paulo - SP">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_destination">Destino</label>
+                        <input type="text" id="edit_trip_destination" required placeholder="Ex: Porto Alegre - RS">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_vehicle">Placa do Veículo</label>
+                        <select id="edit_trip_vehicle" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_driver">Motorista Escalado</label>
+                        <select id="edit_trip_driver" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_receita">Valor Bruto do Frete (Receita)</label>
+                        <input type="number" id="edit_trip_receita" required min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_diesel">Despesa: Combustível (Diesel)</label>
+                        <input type="number" id="edit_trip_diesel" min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_tolls">Despesa: Pedágios</label>
+                        <input type="number" id="edit_trip_tolls" min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_diarias">Despesa: Diárias / Alimentação</label>
+                        <input type="number" id="edit_trip_diarias" min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_comission">Despesa: Comissão do Motorista</label>
+                        <input type="number" id="edit_trip_comission" min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_maint">Despesa: Manutenção em Rota</label>
+                        <input type="number" id="edit_trip_maint" min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_status">Status da Viagem</label>
+                        <select id="edit_trip_status" required>
+                            <option value="Em Viagem">Em Viagem (Operacional)</option>
+                            <option value="Concluída">Concluída (Finalizada)</option>
+                            <option value="Cancelada">Cancelada</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_payment_status">Status de Pagamento</label>
+                        <select id="edit_trip_payment_status" required>
+                            <option value="Pago">Pago (Faturado/Recebido)</option>
+                            <option value="Pendente">Pendente (A Receber)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_trip_payment_date">Previsão de Recebimento</label>
+                        <input type="date" id="edit_trip_payment_date">
+                    </div>
+                </div>
+
+                <!-- Seção de Despesas Extras Itemizadas -->
+                <div class="detail-expenses-section">
+                    <div class="detail-expenses-header">
+                        <h4>Despesas Extras da Viagem</h4>
+                        <span class="badge info" id="edit-total-extras">Total extras: R$ 0,00</span>
+                    </div>
+                    <div id="edit-expenses-list" class="detail-expenses-list">
+                        <!-- Despesas extras renderizadas dinamicamente -->
+                    </div>
+                    <div class="detail-add-expense-row">
+                        <input type="text" id="edit_expense_desc" placeholder="Descrição (ex: Pneu furado, Multa...)" style="flex: 2;">
+                        <input type="number" id="edit_expense_value" placeholder="Valor R$" min="0" step="0.01" style="flex: 1;">
+                        <button type="button" class="btn" id="btn-add-detail-expense" style="padding: 8px 16px; white-space: nowrap;">
+                            + Adicionar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Resumo Financeiro -->
+                <div class="detail-financial-summary" id="edit-financial-summary">
+                    <!-- Calculado dinamicamente -->
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+                    <button type="button" class="btn btn-danger" id="btn-delete-from-detail" style="margin-right: auto;">Excluir Viagem</button>
+                    <button class="btn btn-secondary btn-cancel">Cancelar</button>
+                    <button type="submit" class="btn">Salvar Alterações</button>
                 </div>
             </form>
         </div>
