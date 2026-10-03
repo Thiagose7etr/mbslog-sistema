@@ -1669,15 +1669,26 @@ async function loadTripsFromSupabase() {
         const { data, error } = await supabaseClient.from('trips').select('*');
         if (!error && data) {
             if (data.length > 0) {
-                appData.trips = data;
+                appData.trips = data.map(t => ({
+                    ...t,
+                    dataRecebimento: t.datarecebimento || t.dataRecebimento || ""
+                }));
                 onDataChangedCallback();
             } else {
                 for (const t of SEED_TRIPS) {
-                    await supabaseClient.from('trips').insert([t]);
+                    const payload = {
+                        ...t,
+                        datarecebimento: t.dataRecebimento || ""
+                    };
+                    delete payload.dataRecebimento;
+                    await supabaseClient.from('trips').insert([payload]);
                 }
                 const res = await supabaseClient.from('trips').select('*');
                 if (res.data) {
-                    appData.trips = res.data;
+                    appData.trips = res.data.map(t => ({
+                        ...t,
+                        dataRecebimento: t.datarecebimento || t.dataRecebimento || ""
+                    }));
                     onDataChangedCallback();
                 }
             }
@@ -1750,8 +1761,31 @@ async function addTrip(trip) {
     trip.manutencao = parseFloat(trip.manutencao) || 0;
 
     if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
-        await supabaseClient.from('trips').insert([trip]);
-        await loadTripsFromSupabase();
+        const payload = {
+            id: trip.id,
+            data: trip.data || "",
+            cliente: trip.cliente || "",
+            origem: trip.origem || "",
+            destino: trip.destino || "",
+            placa: trip.placa || "",
+            motorista: trip.motorista || "",
+            receita: trip.receita,
+            combustivel: trip.combustivel,
+            pedagio: trip.pedagio,
+            diarias: trip.diarias,
+            comissao: trip.comissao,
+            manutencao: trip.manutencao,
+            status: trip.status || "Concluída",
+            pago: trip.pago || "Pago",
+            datarecebimento: trip.dataRecebimento || trip.datarecebimento || ""
+        };
+        const { error } = await supabaseClient.from('trips').insert([payload]);
+        if (error) {
+            console.error("Erro ao salvar viagem no Supabase:", error);
+            alert("Erro ao salvar viagem no Supabase: " + error.message);
+        } else {
+            await loadTripsFromSupabase();
+        }
     } else {
         appData.trips.push(trip);
         localStorage.setItem("mbslog_trips", JSON.stringify(appData.trips));
@@ -1793,13 +1827,9 @@ async function removeTrip(id) {
 }
 
 async function updateTripStatus(id, newStatus) {
-    if (USE_FIREBASE && db) {
-        const querySnapshot = await db.collection("trips").get();
-        querySnapshot.forEach(async (docRef) => {
-            if (docRef.data().id === id || docRef.id === id) {
-                await db.collection("trips").doc(docRef.id).update({ status: newStatus });
-            }
-        });
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('trips').update({ status: newStatus }).eq('id', id);
+        await loadTripsFromSupabase();
     } else {
         appData.trips = appData.trips.map(t => {
             if (t.id === id) t.status = newStatus;
@@ -1811,13 +1841,9 @@ async function updateTripStatus(id, newStatus) {
 }
 
 async function updateTripPayment(id, newPayment) {
-    if (USE_FIREBASE && db) {
-        const querySnapshot = await db.collection("trips").get();
-        querySnapshot.forEach(async (docRef) => {
-            if (docRef.data().id === id || docRef.id === id) {
-                await db.collection("trips").doc(docRef.id).update({ pago: newPayment });
-            }
-        });
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        await supabaseClient.from('trips').update({ pago: newPayment }).eq('id', id);
+        await loadTripsFromSupabase();
     } else {
         appData.trips = appData.trips.map(t => {
             if (t.id === id) t.pago = newPayment;
@@ -1829,18 +1855,17 @@ async function updateTripPayment(id, newPayment) {
 }
 
 async function addExtraExpense(id, amount) {
-    if (USE_FIREBASE && db) {
-        const querySnapshot = await db.collection("trips").get();
-        querySnapshot.forEach(async (docRef) => {
-            if (docRef.data().id === id || docRef.id === id) {
-                const currentExtra = docRef.data().despesaExtra || 0;
-                await db.collection("trips").doc(docRef.id).update({ despesaExtra: currentExtra + amount });
-            }
-        });
+    const trip = appData.trips.find(t => t.id === id);
+    const newExtra = ((trip && trip.despesaExtra) || 0) + amount;
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        const newMaint = ((trip && trip.manutencao) || 0) + amount;
+        await supabaseClient.from('trips').update({ manutencao: newMaint }).eq('id', id);
+        await loadTripsFromSupabase();
     } else {
         appData.trips = appData.trips.map(t => {
             if (t.id === id) {
-                t.despesaExtra = (t.despesaExtra || 0) + amount;
+                t.despesaExtra = newExtra;
+                t.manutencao = (t.manutencao || 0) + amount;
             }
             return t;
         });
@@ -1850,13 +1875,31 @@ async function addExtraExpense(id, amount) {
 }
 
 async function updateTrip(id, updatedData) {
-    if (USE_FIREBASE && db) {
-        const querySnapshot = await db.collection("trips").get();
-        querySnapshot.forEach(async (docRef) => {
-            if (docRef.data().id === id || docRef.id === id) {
-                await db.collection("trips").doc(docRef.id).update(updatedData);
-            }
-        });
+    if (typeof USE_SUPABASE !== "undefined" && USE_SUPABASE && supabaseClient) {
+        const payload = {
+            cliente: updatedData.cliente,
+            data: updatedData.data,
+            origem: updatedData.origem,
+            destino: updatedData.destino,
+            placa: updatedData.placa,
+            motorista: updatedData.motorista,
+            receita: updatedData.receita,
+            combustivel: updatedData.combustivel,
+            pedagio: updatedData.pedagio,
+            diarias: updatedData.diarias,
+            comissao: updatedData.comissao,
+            manutencao: updatedData.manutencao,
+            status: updatedData.status,
+            pago: updatedData.pago,
+            datarecebimento: updatedData.dataRecebimento || updatedData.datarecebimento || ""
+        };
+        const { error } = await supabaseClient.from('trips').update(payload).eq('id', id);
+        if (error) {
+            console.error("Erro ao atualizar viagem no Supabase:", error);
+            alert("Erro ao atualizar viagem: " + error.message);
+        } else {
+            await loadTripsFromSupabase();
+        }
     } else {
         appData.trips = appData.trips.map(t => {
             if (t.id === id) {
