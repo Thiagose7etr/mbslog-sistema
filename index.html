@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="VAYKO FLEET - Sistema de Gestão Logística e Controle Financeiro por VAYKO LABS.">
+    <title>VAYKO FLEET | Gestão Logística Integrada</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚚</text></svg>">
+    <!-- Chart.js para renderização de gráficos financeiros -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- SDKs do Firebase Compat para permitir execução local sem problemas de CORS de Módulos ES6 -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="assets/logo_vayko.jpg" alt="VAYKO LABS Logo">
+            <span>VAYKO FLEET</span>
+        </div>
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <button class="nav-link active" data-tab="tab-dashboard">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                    Painel Geral
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-tab="tab-trips">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+                    Viagens (Fretes)
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-tab="tab-fleet">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2" ry="2"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                    Frota & Equipe
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-tab="tab-reports">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    Relatórios
+                </button>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            Desenvolvido por<br>
+            <a href="https://vaykolabs.com" target="_blank"><strong>VAYKO LABS</strong></a>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="main-content">
+
+        <!-- 1. TAB: DASHBOARD -->
+        <section class="tab-panel active" id="tab-dashboard">
+            <div class="panel-header">
+                <div>
+                    <h2>Painel Geral</h2>
+                    <p>Visão geral da operação e balanço financeiro.</p>
+                </div>
+                <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 0.85rem; font-weight: 600; white-space: nowrap;">Período:</label>
+                        <select id="filter-period" class="filter-select filter-sync-period">
+                            <option value="all" selected>Todo o Histórico</option>
+                            <optgroup label="── Por Mês ──">
+                                <option value="m-0">Janeiro</option>
+                                <option value="m-1">Fevereiro</option>
+                                <option value="m-2">Março</option>
+                                <option value="m-3">Abril</option>
+                                <option value="m-4">Maio</option>
+                                <option value="m-5">Junho</option>
+                                <option value="m-6">Julho</option>
+                                <option value="m-7">Agosto</option>
+                                <option value="m-8">Setembro</option>
+                                <option value="m-9">Outubro</option>
+                                <option value="m-10">Novembro</option>
+                                <option value="m-11">Dezembro</option>
+                            </optgroup>
+                            <optgroup label="── Por Trimestre ──">
+                                <option value="q-1">1º Trimestre (Jan - Mar)</option>
+                                <option value="q-2">2º Trimestre (Abr - Jun)</option>
+                                <option value="q-3">3º Trimestre (Jul - Set)</option>
+                                <option value="q-4">4º Trimestre (Out - Dez)</option>
+                            </optgroup>
+                            <optgroup label="── Por Semestre ──">
+                                <option value="s-1">1º Semestre (Jan - Jun)</option>
+                                <option value="s-2">2º Semestre (Jul - Dez)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 0.85rem; font-weight: 600; white-space: nowrap;">Ano:</label>
+                        <select id="filter-year" class="filter-select filter-sync-year">
+                            <!-- Populado por JS -->
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" id="btn-clear-filters" style="padding: 6px 14px; font-size: 0.8rem;">Limpar Filtros</button>
+                    <span class="badge info" style="font-weight: 600; background: rgba(43, 226, 230, 0.15); border: 1px solid var(--brand-primary); color: var(--brand-primary);">Cliente: MBSLOG</span>
+                    <span id="db-status" class="badge info">Carregando...</span>
+                </div>
+            </div>
+
+            <!-- KPIs -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <span class="kpi-title">Faturamento Total</span>
+                    <span class="kpi-value" id="kpi-revenue">R$ 0,00</span>
+                    <span class="kpi-footer">Receita bruta de fretes</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">Contas a Receber</span>
+                    <span class="kpi-value" id="kpi-receivables" style="color: var(--brand-primary);">R$ 0,00</span>
+                    <span class="kpi-footer">Previsão de entradas futuras</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">Custos Totais</span>
+                    <span class="kpi-value" id="kpi-expenses" style="color: var(--danger);">R$ 0,00</span>
+                    <span class="kpi-footer">Pedágios, diesel e diárias</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">Lucro Líquido Real</span>
+                    <span class="kpi-value profit-positive" id="kpi-profit">R$ 0,00</span>
+                    <span class="kpi-footer" id="kpi-margin-desc">Margem média</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">Viagens Ativas</span>
+                    <span class="kpi-value" id="kpi-active-trips" style="color: var(--brand-accent);">0</span>
+                    <span class="kpi-footer">Rotas em andamento</span>
+                </div>
+            </div>
+
+             <!-- Dashboard Grid -->
+            <div class="dashboard-grid">
+                <!-- Gráfico Financeiro -->
+                <div class="dashboard-card">
+                    <h3>Histórico de Caixa (Entradas vs Custos)</h3>
+                    <div style="position: relative; height: 320px; width: 100%;">
+                        <canvas id="canvas-financial"></canvas>
+                    </div>
+                </div>
+
+                <!-- Central de Alertas -->
+                <div class="dashboard-card">
+                    <h3>Alertas de Operação e CNH</h3>
+                    <div class="alert-box" id="alert-container">
+                        <div class="alert-item info">Verificando banco de dados...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Projeção de Contas a Receber -->
+            <div class="dashboard-card" style="margin-top: 30px;">
+                <h3>Projeção de Contas a Receber (Próximos Faturamentos Pendentes)</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data Prevista</th>
+                                <th>Cliente</th>
+                                <th>Rota</th>
+                                <th>Placa</th>
+                                <th>Valor a Receber</th>
+                                <th>Dias Restantes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-receivables">
+                            <!-- Conteúdo populado por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. TAB: VIAGENS -->
+        <section class="tab-panel" id="tab-trips">
+            <div class="panel-header">
+                <div>
+                    <h2>Registro de Viagens</h2>
+                    <p>Controle de rotas, custos e saldo líquido por viagem.</p>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 0.85rem; font-weight: 600; white-space: nowrap;">Período:</label>
+                        <select id="filter-period-trips" class="filter-select filter-sync-period">
+                            <option value="all" selected>Todo o Histórico</option>
+                            <optgroup label="── Por Mês ──">
+                                <option value="m-0">Janeiro</option>
+                                <option value="m-1">Fevereiro</option>
+                                <option value="m-2">Março</option>
+                                <option value="m-3">Abril</option>
+                                <option value="m-4">Maio</option>
+                                <option value="m-5">Junho</option>
+                                <option value="m-6">Julho</option>
+                                <option value="m-7">Agosto</option>
+                                <option value="m-8">Setembro</option>
+                                <option value="m-9">Outubro</option>
+                                <option value="m-10">Novembro</option>
+                                <option value="m-11">Dezembro</option>
+                            </optgroup>
+                            <optgroup label="── Por Trimestre ──">
+                                <option value="q-1">1º Trimestre (Jan - Mar)</option>
+                                <option value="q-2">2º Trimestre (Abr - Jun)</option>
+                                <option value="q-3">3º Trimestre (Jul - Set)</option>
+                                <option value="q-4">4º Trimestre (Out - Dez)</option>
+                            </optgroup>
+                            <optgroup label="── Por Semestre ──">
+                                <option value="s-1">1º Semestre (Jan - Jun)</option>
+                                <option value="s-2">2º Semestre (Jul - Dez)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 0.85rem; font-weight: 600; white-space: nowrap;">Ano:</label>
+                        <select id="filter-year-trips" class="filter-select filter-sync-year">
+                            <!-- Populado por JS -->
+                        </select>
+                    </div>
+                    <div style="border-left: 1px solid var(--border-color); height: 24px; margin: 0 4px;"></div>
+                    <button class="btn btn-secondary" id="btn-export-csv" style="padding: 8px 14px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Exportar Excel
+                    </button>
+                    <button class="btn btn-secondary" id="btn-import-csv" style="padding: 8px 14px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        Importar Excel
+                    </button>
+                    <input type="file" id="input-import-csv" accept=".csv" style="display: none;">
+                    
+                    <button class="btn" id="btn-new-trip">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        Nova Viagem
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Cliente</th>
+                            <th>Rota</th>
+                            <th>Placa</th>
+                            <th>Receita</th>
+                            <th>Custos</th>
+                            <th>Saldo Líquido</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-trips">
+                        <!-- Conteúdo populado por JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 3. TAB: FROTA & EQUIPE -->
+        <section class="tab-panel" id="tab-fleet">
+            <!-- Subseção Veículos -->
+            <div class="panel-header" style="margin-bottom: 20px;">
+                <div>
+                    <h2>Frota de Veículos</h2>
+                    <p>Veículos cadastrados próprios e agregados.</p>
+                </div>
+                <button class="btn" id="btn-new-vehicle">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Novo Veículo
+                </button>
+            </div>
+
+            <div class="table-container" style="margin-bottom: 50px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Placa</th>
+                            <th>Modelo / Cavalo</th>
+                            <th>Tipo</th>
+                            <th>Propriedade</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-vehicles">
+                        <!-- Conteúdo populado por JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Subseção Motoristas -->
+            <div class="panel-header" style="margin-bottom: 20px;">
+                <div>
+                    <h2>Equipe de Motoristas</h2>
+                    <p>Lista de condutores ativos e validade de CNH.</p>
+                </div>
+                <button class="btn" id="btn-new-driver">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Novo Motorista
+                </button>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome do Motorista</th>
+                            <th>Nº CNH</th>
+                            <th>Categoria</th>
+                            <th>Vencimento CNH</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-drivers">
+                        <!-- Conteúdo populado por JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 4. TAB: RELATÓRIOS -->
+        <section class="tab-panel" id="tab-reports">
+            <div class="panel-header">
+                <div>
+                    <h2>Relatórios Consolidados</h2>
+                    <p>Agrupamento inteligente de custos, faturamentos e lucros.</p>
+                </div>
+                <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 0.85rem; font-weight: 600; white-space: nowrap;">Período:</label>
+                        <select id="filter-period-reports" class="filter-select filter-sync-period">
+                            <option value="all" selected>Todo o Histórico</option>
+                            <optgroup label="── Por Mês ──">
+                                <option value="m-0">Janeiro</option>
+                                <option value="m-1">Fevereiro</option>
+                                <option value="m-2">Março</option>
+                                <option value="m-3">Abril</option>
+                                <option value="m-4">Maio</option>
+                                <option value="m-5">Junho</option>
+                                <option value="m-6">Julho</option>
+                                <option value="m-7">Agosto</option>
+                                <option value="m-8">Setembro</option>
+                                <option value="m-9">Outubro</option>
+                                <option value="m-10">Novembro</option>
+                                <option value="m-11">Dezembro</option>
+                            </optgroup>
+                            <optgroup label="── Por Trimestre ──">
+                                <option value="q-1">1º Trimestre (Jan - Mar)</option>
+                                <option value="q-2">2º Trimestre (Abr - Jun)</option>
+                                <option value="q-3">3º Trimestre (Jul - Set)</option>
+                                <option value="q-4">4º Trimestre (Out - Dez)</option>
+                            </optgroup>
+                            <optgroup label="── Por Semestre ──">
+                                <option value="s-1">1º Semestre (Jan - Jun)</option>
+                                <option value="s-2">2º Semestre (Jul - Dez)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 0.85rem; font-weight: 600; white-space: nowrap;">Ano:</label>
+                        <select id="filter-year-reports" class="filter-select filter-sync-year">
+                            <!-- Populado por JS -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="reports-grid">
+                <!-- Relatório Custo por Veículo -->
+                <div class="report-section">
+                    <div class="report-section-header">
+                        <h3>Despesas Acumuladas por Veículo (Placa)</h3>
+                        <p style="font-size:0.8rem; color: var(--text-secondary);">Ajuda a identificar veículos mais caros</p>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Placa</th>
+                                    <th>Nº de Viagens</th>
+                                    <th>Custo Diesel</th>
+                                    <th>Custo Manutenção</th>
+                                    <th>Custos Acumulados</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-report-vehicles">
+                                <!-- Conteúdo populado por JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Relatório Faturamento por Cliente -->
+                <div class="report-section">
+                    <div class="report-section-header">
+                        <h3>Volume de Vendas e Rentabilidade por Cliente</h3>
+                        <p style="font-size:0.8rem; color: var(--text-secondary);">Principais parceiros comerciais</p>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Cliente</th>
+                                    <th>Viagens Realizadas</th>
+                                    <th>Faturamento Bruto</th>
+                                    <th>Lucro Líquido Geral</th>
+                                    <th>Margem Operacional</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-report-clients">
+                                <!-- Conteúdo populado por JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- MODAIS DE CADASTRO -->
+    <!-- ========================================== -->
+
+    <!-- Modal Nova Viagem -->
+    <div class="modal-overlay" id="modal-trip">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Lançamento de Nova Viagem</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="form-trip">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="trip_client">Cliente Faturado</label>
+                        <input type="text" id="trip_client" required placeholder="Ex: Ambev SA">
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_date">Data da Viagem</label>
+                        <input type="date" id="trip_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_origin">Origem</label>
+                        <input type="text" id="trip_origin" required placeholder="Ex: São Paulo - SP">
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_destination">Destino</label>
+                        <input type="text" id="trip_destination" required placeholder="Ex: Porto Alegre - RS">
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_vehicle">Placa do Veículo</label>
+                        <select id="trip_vehicle" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_driver">Motorista Escalado</label>
+                        <select id="trip_driver" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_receita">Valor Bruto do Frete (Receita)</label>
+                        <input type="number" id="trip_receita" required min="0" step="0.01" placeholder="R$ 0,00">
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_diesel">Despesa: Combustível (Diesel)</label>
+                        <input type="number" id="trip_diesel" min="0" step="0.01" placeholder="R$ 0,00" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_tolls">Despesa: Pedágios</label>
+                        <input type="number" id="trip_tolls" min="0" step="0.01" placeholder="R$ 0,00" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_diarias">Despesa: Diárias / Alimentação</label>
+                        <input type="number" id="trip_diarias" min="0" step="0.01" placeholder="R$ 0,00" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_comission">Despesa: Comissão do Motorista</label>
+                        <input type="number" id="trip_comission" min="0" step="0.01" placeholder="R$ 0,00" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_maint">Despesa: Manutenção em Rota</label>
+                        <input type="number" id="trip_maint" min="0" step="0.01" placeholder="R$ 0,00" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_status">Status Inicial</label>
+                        <select id="trip_status" required>
+                            <option value="Em Viagem">Em Viagem (Operacional)</option>
+                            <option value="Concluída" selected>Concluída (Finalizada)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_payment_status">Status de Pagamento</label>
+                        <select id="trip_payment_status" required>
+                            <option value="Pago" selected>Pago (Faturado/Recebido)</option>
+                            <option value="Pendente">Pendente (A Receber)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_payment_date">Previsão de Recebimento</label>
+                        <input type="date" id="trip_payment_date">
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                    <button class="btn btn-secondary btn-cancel">Cancelar</button>
+                    <button type="submit" class="btn">Salvar Viagem</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Novo Veículo -->
+    <div class="modal-overlay" id="modal-vehicle">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Cadastro de Veículo</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="form-vehicle">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="vehicle_plate">Placa do Cavalo/Carreta</label>
+                        <input type="text" id="vehicle_plate" required placeholder="Ex: MBS-1234">
+                    </div>
+                    <div class="form-group">
+                        <label for="vehicle_model">Marca / Modelo</label>
+                        <input type="text" id="vehicle_model" required placeholder="Ex: Scania R450">
+                    </div>
+                    <div class="form-group">
+                        <label for="vehicle_type">Tipo de Veículo</label>
+                        <select id="vehicle_type" required>
+                            <option value="Carreta / Bitrem">Carreta / Bitrem</option>
+                            <option value="Caminhão Truck (3 eixos)">Caminhão Truck (3 eixos)</option>
+                            <option value="Caminhão Toco (2 eixos)">Caminhão Toco (2 eixos)</option>
+                            <option value="Utilitário / Vans">Utilitário / Vans</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="vehicle_ownership">Tipo de Propriedade</label>
+                        <select id="vehicle_ownership" required>
+                            <option value="Própria">Própria</option>
+                            <option value="Terceirizada">Terceirizada (Agregado)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                    <button class="btn btn-secondary btn-cancel">Cancelar</button>
+                    <button type="submit" class="btn">Salvar Veículo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Novo Motorista -->
+    <div class="modal-overlay" id="modal-driver">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Cadastro de Motorista</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="form-driver">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="driver_name">Nome Completo</label>
+                        <input type="text" id="driver_name" required placeholder="Ex: João da Silva">
+                    </div>
+                    <div class="form-group">
+                        <label for="driver_cnh">Número da CNH</label>
+                        <input type="text" id="driver_cnh" required placeholder="Apenas números">
+                    </div>
+                    <div class="form-group">
+                        <label for="driver_cat">Categoria CNH</label>
+                        <select id="driver_cat" required>
+                            <option value="E">E</option>
+                            <option value="AE">AE</option>
+                            <option value="D">D</option>
+                            <option value="AD">AD</option>
+                            <option value="C">C</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="driver_validity">Validade da CNH</label>
+                        <input type="date" id="driver_validity" required>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                    <button class="btn btn-secondary btn-cancel">Cancelar</button>
+                    <button type="submit" class="btn">Salvar Motorista</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- CONFIGURAÇÕES DE DB E INICIALIZAÇÃO -->
+    <script src="config-db.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
