@@ -454,18 +454,52 @@ textarea:focus {
     margin-top: 15px;
     border: 1px solid var(--border-color);
     border-radius: 8px;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+}
+
+.table-container::-webkit-scrollbar {
+    height: 6px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--brand-primary);
 }
 
 table {
     width: 100%;
+    min-width: 640px;
     border-collapse: collapse;
     text-align: left;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
+}
+
+#tab-trips table {
+    min-width: 820px;
+}
+
+#tab-reports table {
+    min-width: 600px;
+}
+
+.table-scroll-hint {
+    display: none;
 }
 
 th, td {
-    padding: 14px 18px;
+    padding: 12px 14px;
     border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
 }
 
 th {
@@ -475,6 +509,8 @@ th {
     text-transform: uppercase;
     font-size: 0.75rem;
     letter-spacing: 0.05em;
+    position: sticky;
+    top: 0;
 }
 
 tr:nth-child(even) td {
@@ -545,7 +581,10 @@ tr:hover td {
     text-align: right;
 }
 
-/* Responsive */
+/* ============================================================= */
+/* RESPONSIVIDADE PROFISSIONAL (TABLET E MOBILE)                 */
+/* ============================================================= */
+
 @media (max-width: 1024px) {
     body {
         flex-direction: column;
@@ -558,37 +597,313 @@ tr:hover td {
         height: auto;
         border-right: none;
         border-bottom: 1px solid var(--border-color);
-        padding: 15px 0;
+        padding: 14px 0 10px 0;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background-color: var(--bg-secondary);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     }
 
     .sidebar-logo {
-        margin-bottom: 15px;
+        margin-bottom: 10px;
+        padding: 0 18px;
+    }
+
+    .sidebar-logo img {
+        height: 32px;
+    }
+
+    .sidebar-logo span {
+        font-size: 1.25rem;
+    }
+
+    .sidebar-footer {
+        display: none; /* No mobile e tablet, economiza espaço vertical */
     }
 
     .nav-menu {
         flex-direction: row;
         overflow-x: auto;
-        padding: 0 20px;
-        gap: 15px;
+        padding: 0 14px 6px 14px;
+        gap: 8px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .nav-menu::-webkit-scrollbar {
+        display: none;
+    }
+
+    .nav-link {
+        padding: 8px 14px;
+        font-size: 0.88rem;
+        gap: 8px;
+        white-space: nowrap;
+        border-radius: 8px;
     }
 
     .nav-link.active {
         border-left: none;
         border-bottom: 3px solid var(--brand-primary);
-        border-radius: 0;
+        border-radius: 8px 8px 0 0;
     }
 
     .main-content {
-        padding: 20px;
+        padding: 20px 16px;
         height: auto;
     }
 
     .dashboard-grid {
         grid-template-columns: 1fr;
+        gap: 20px;
     }
 
     .form-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Telas de Celulares e Telas Pequenas (até 768px) */
+@media (max-width: 768px) {
+    .main-content {
+        padding: 12px 10px 40px 10px;
+    }
+
+    .panel-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+    }
+
+    .panel-header h2 {
+        font-size: 1.35rem;
+    }
+
+    .panel-header p {
+        font-size: 0.82rem;
+    }
+
+    /* Container de botões e filtros no cabeçalho */
+    .panel-header > div:last-child {
+        display: flex;
+        flex-direction: column;
+        gap: 10px !important;
+        width: 100%;
+        align-items: stretch !important;
+    }
+
+    .panel-header .filter-group,
+    .panel-header > div:last-child > div {
+        width: 100%;
+        display: flex;
+        gap: 8px;
+    }
+
+    .filter-select {
+        flex: 1;
+        width: 100%;
+        min-width: 0;
+        padding: 8px 10px;
+        font-size: 0.82rem;
+    }
+
+    .panel-header .btn,
+    .panel-header .btn-secondary {
+        width: 100%;
+        justify-content: center;
+        padding: 10px 14px;
+        font-size: 0.85rem;
+    }
+
+    /* Cards de Indicadores (KPIs) - Grade 2x2 moderna */
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .kpi-card {
+        padding: 12px 10px;
+        border-radius: 10px;
+        gap: 3px;
+    }
+
+    .kpi-grid .kpi-card:last-child {
+        grid-column: span 2; /* 5º card ocupa toda a largura */
+    }
+
+    .kpi-title {
+        font-size: 0.68rem;
+        letter-spacing: 0.02em;
+    }
+
+    .kpi-value {
+        font-size: 1.25rem;
+    }
+
+    .kpi-footer {
+        font-size: 0.68rem;
+    }
+
+    /* Cards do Dashboard */
+    .dashboard-grid {
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+
+    .dashboard-card {
+        padding: 14px 10px;
+        border-radius: 10px;
+        margin-bottom: 14px;
+    }
+
+    .dashboard-card h3 {
+        font-size: 0.98rem;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+    }
+
+    /* Gráfico no Celular */
+    .dashboard-card > div[style*="height"] {
+        height: 220px !important;
+    }
+
+    /* Alertas */
+    .alert-box {
+        gap: 8px;
+    }
+
+    .alert-item {
+        padding: 10px 12px;
+        font-size: 0.82rem;
+        border-radius: 6px;
+        line-height: 1.4;
+    }
+
+    /* Dica de rolagem horizontal em tabelas no celular */
+    .table-scroll-hint {
+        display: flex !important;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        font-size: 0.72rem;
+        color: var(--brand-primary);
+        margin-bottom: 6px;
+        font-weight: 500;
+    }
+
+    .table-container {
+        margin-top: 8px;
+        border-radius: 8px;
+    }
+
+    th, td {
+        padding: 10px 12px;
+        font-size: 0.82rem;
+    }
+
+    th {
+        font-size: 0.72rem;
+    }
+
+    /* Relatórios */
+    .reports-grid {
+        gap: 16px;
+    }
+
+    .report-section {
+        padding: 14px 10px;
+        border-radius: 10px;
+    }
+
+    .report-section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        margin-bottom: 10px;
+    }
+
+    .report-section-header h3 {
+        font-size: 1rem;
+    }
+
+    /* Modais no Celular */
+    .modal-overlay {
+        padding: 8px;
+        align-items: flex-end;
+    }
+
+    .modal-box {
+        padding: 18px 14px;
+        border-radius: 16px 16px 0 0;
+        max-height: 94vh;
+        width: 100%;
+    }
+
+    .modal-header {
+        margin-bottom: 16px;
+        padding-bottom: 10px;
+    }
+
+    .modal-header h3 {
+        font-size: 1.1rem;
+    }
+
+    .form-grid {
+        gap: 10px;
+    }
+
+    .form-group label {
+        font-size: 0.78rem;
+        margin-bottom: 3px;
+    }
+
+    .form-group input,
+    .form-group select {
+        padding: 9px 10px;
+        font-size: 0.88rem;
+    }
+
+    .detail-expenses-section {
+        padding: 12px 10px;
+        border-radius: 8px;
+        margin-top: 6px;
+        margin-bottom: 14px;
+    }
+
+    .detail-expenses-header h4 {
+        font-size: 0.95rem;
+    }
+
+    .detail-financial-summary {
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 6px;
+    }
+
+    .summary-card {
+        padding: 8px 4px;
+        border-radius: 6px;
+    }
+
+    .summary-card .summary-label {
+        font-size: 0.62rem;
+    }
+
+    .summary-card .summary-value {
+        font-size: 0.92rem;
+    }
+
+    .detail-add-expense-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .detail-add-expense-row input,
+    .detail-add-expense-row button {
+        width: 100% !important;
     }
 }
 
@@ -926,8 +1241,9 @@ tr.trip-row-clickable:hover td {
             </div>
 
             <!-- Projeção de Contas a Receber -->
-            <div class="dashboard-card" style="margin-top: 30px;">
+            <div class="dashboard-card">
                 <h3>Projeção de Contas a Receber (Próximos Faturamentos Pendentes)</h3>
+                <span class="table-scroll-hint">⇄ Deslize para ver todas as colunas</span>
                 <div class="table-container">
                     <table>
                         <thead>
@@ -1010,6 +1326,7 @@ tr.trip-row-clickable:hover td {
                 </div>
             </div>
 
+            <span class="table-scroll-hint">⇄ Deslize para ver todas as colunas</span>
             <div class="table-container">
                 <table>
                     <thead>
@@ -1046,7 +1363,8 @@ tr.trip-row-clickable:hover td {
                 </button>
             </div>
 
-            <div class="table-container" style="margin-bottom: 50px;">
+            <span class="table-scroll-hint">⇄ Deslize para ver todas as colunas</span>
+            <div class="table-container" style="margin-bottom: 35px;">
                 <table>
                     <thead>
                         <tr>
@@ -1075,6 +1393,7 @@ tr.trip-row-clickable:hover td {
                 </button>
             </div>
 
+            <span class="table-scroll-hint">⇄ Deslize para ver todas as colunas</span>
             <div class="table-container">
                 <table>
                     <thead>
@@ -1147,6 +1466,7 @@ tr.trip-row-clickable:hover td {
                         <h3>Despesas Acumuladas por Veículo (Placa)</h3>
                         <p style="font-size:0.8rem; color: var(--text-secondary);">Ajuda a identificar veículos mais caros</p>
                     </div>
+                    <span class="table-scroll-hint">⇄ Deslize para ver todas as colunas</span>
                     <div class="table-container">
                         <table>
                             <thead>
@@ -1171,6 +1491,7 @@ tr.trip-row-clickable:hover td {
                         <h3>Volume de Vendas e Rentabilidade por Cliente</h3>
                         <p style="font-size:0.8rem; color: var(--text-secondary);">Principais parceiros comerciais</p>
                     </div>
+                    <span class="table-scroll-hint">⇄ Deslize para ver todas as colunas</span>
                     <div class="table-container">
                         <table>
                             <thead>
